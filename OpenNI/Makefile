@@ -1,19 +1,31 @@
-IDIR = ./
+IDIR = ./include
 CXX = c++
 CFLAGS = -I$(IDIR) --std=c++11
-
 LIBS = -lOpenNi2 -framework SDL2
 
-OBJ = RGBDViewer.o NIDevice.o viewer.o
-programs = viewer
+_DEPS = RGBDViewer.hpp NIDevice.hpp
+DEPS = $(patsubst %,$(IDIR)/%,$(_DEPS))
 
-all : ${programs}
+ODIR=obj
 
-%.o : %.cxx
-	${CXX} -c -o $@ $<  ${CFLAGS}
+_OBJ = RGBDViewer.o NIDevice.o viewer.o
+OBJ = $(patsubst %,$(ODIR)/%,$(_OBJ))
 
-${programs} : ${OBJ}
-	${CXX} -o $@ ${OBJ} ${LIBS} ${CFLAGS}
+SDIR = ./src
+BDIR = ./bin
 
+PROGRAMS = viewer
 
+MKDIR_P = mkdir -p
+DIRS = ${ODIR} ${SDIR} ${BDIR}
 
+all : ${DIRS} ${PROGRAMS}
+
+${DIRS} :
+	${MKDIR_P} $@
+
+${ODIR}/%.o : ${SDIR}/%.cxx ${ODIR} ${DEPS}
+	${CXX} -c -o $@ $< ${CFLAGS}
+
+${PROGRAMS} : ${OBJ} ${BDIR}
+	${CXX} -o ${BDIR}/$@ ${OBJ} ${CFLAGS} ${LIBS}
