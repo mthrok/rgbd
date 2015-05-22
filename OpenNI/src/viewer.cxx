@@ -1,6 +1,5 @@
-// c++ viewer_tmp.cxx NIDevice.cxx -lOpenNi2 -framework SDL2 --std=c++11
 #include "NIDevice.hpp"
-#include "RGBDViewer.hpp"
+#include "RGBDVisualizer.hpp"
 
 #include <stdio.h>
 #include <stdexcept>
@@ -17,9 +16,9 @@ void main_exec() {
   nid.getDepthResolution(depthW, depthH);
   nid.getColorResolution(colorW, colorH);
 
-  // Initialize viewer
-  RGBDViewer viewer{depthW, depthH, colorW, colorH};
-  viewer.initWindow();
+  // Initialize visualizer
+  RGBDVisualizer visualizer{depthW, depthH, colorW, colorH};
+  visualizer.initWindow();
 
   // Start streams
   nid.startDepthStream();
@@ -27,38 +26,34 @@ void main_exec() {
 
   // Main loop
   while (1) {
-    SDL_Event e;
-    if (SDL_PollEvent(&e)) {
-      if (e.type == SDL_QUIT) {
-	break;
-      }
-    }
+    if (visualizer.isStopped())
+      break;
     // Read depth and color
     try {
       nid.readDepthStream();
       nid.readColorStream();
-      nid.copyDepthData(viewer.getDepthBuffer());
-      nid.copyColorData(viewer.getColorBuffer());
+      nid.copyDepthData(visualizer.getDepthBuffer());
+      nid.copyColorData(visualizer.getColorBuffer());
       nid.releaseDepthFrame();
       nid.releaseColorFrame();
     } catch(const std::runtime_error& e) {
       printf("%s/n", e.what());
     }
     // Update window
-    viewer.refreshWindow();
+    visualizer.refreshWindow();
   }
 }
 
 int main(int argc, char *argv[]) {  
   NIDevice::initONI();
-  RGBDViewer::initSDL();
+  RGBDVisualizer::initSDL();
   try {
     main_exec();
   } catch (const std::exception& e) {
     printf("%s\n", e.what());
     return -1;
   }
-  RGBDViewer::quitSDL();
+  RGBDVisualizer::quitSDL();
   NIDevice::quitONI();
   return 0;
 }

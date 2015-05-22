@@ -1,15 +1,15 @@
-#include "RGBDViewer.hpp"
+#include "RGBDVisualizer.hpp"
 #include <string.h>
 
-void RGBDViewer::initSDL(Uint32 flag) {
+void RGBDVisualizer::initSDL(Uint32 flag) {
   SDL_Init(flag);
 }
 
-void RGBDViewer::quitSDL() {
+void RGBDVisualizer::quitSDL() {
   SDL_Quit();
 }
 
-RGBDViewer::RGBDViewer(int depthW, int depthH, int colorW, int colorH)
+RGBDVisualizer::RGBDVisualizer(int depthW, int depthH, int colorW, int colorH)
   : m_pWindow(NULL)
   , m_pTexture(NULL)
   , m_pRenderer(NULL)
@@ -24,7 +24,7 @@ RGBDViewer::RGBDViewer(int depthW, int depthH, int colorW, int colorH)
   , m_pDepthBuff(NULL)
 {}
 
-RGBDViewer::~RGBDViewer() {
+RGBDVisualizer::~RGBDVisualizer() {
   if (m_pRenderer)
     SDL_DestroyRenderer(m_pRenderer);
   if (m_pTexture)
@@ -37,17 +37,17 @@ RGBDViewer::~RGBDViewer() {
     delete[] m_pColorBuff;
 }
 
-void RGBDViewer::initWindow() {
+void RGBDVisualizer::initWindow() {
   createWindow();
   createConversionBuffers();
 }
 
-void RGBDViewer::createWindow() {
+void RGBDVisualizer::createWindow() {
   // Check the size
   int width = m_depthW + m_colorW;
   int height = (m_depthH > m_colorH) ? m_depthH : m_colorH;
   // Create window, renderer and texture
-  m_pWindow = SDL_CreateWindow("RGBDViewer", 0, 0, width, height, 0);
+  m_pWindow = SDL_CreateWindow("RGBDVisualizer", 0, 0, width, height, 0);
   m_pRenderer = SDL_CreateRenderer(m_pWindow, -1, SDL_RENDERER_ACCELERATED);
   m_pTexture = SDL_CreateTexture(m_pRenderer,
     SDL_PIXELFORMAT_BGRA8888, SDL_TEXTUREACCESS_STREAMING, width, height);
@@ -57,7 +57,7 @@ void RGBDViewer::createWindow() {
   m_colorRect.w = m_colorW; m_colorRect.h = m_colorH;
 }
 
-void RGBDViewer::createConversionBuffers() {
+void RGBDVisualizer::createConversionBuffers() {
   uint64_t nDepthPix = uint64_t(m_depthW) * m_depthH * m_channel;
   uint64_t nColorPix = uint64_t(m_colorW) * m_colorH * m_channel;
   m_pDepthBuff = (uint16_t *)new uint8_t[nDepthPix];
@@ -68,26 +68,43 @@ void RGBDViewer::createConversionBuffers() {
   memset(m_pColorBuff, 0, nColorPix);
 }
 
-uint8_t* RGBDViewer::getColorBuffer() {
+uint8_t* RGBDVisualizer::getColorBuffer() const {
   return (uint8_t*)m_pColorBuff;
 }
 
-uint16_t* RGBDViewer::getDepthBuffer() {
+uint16_t* RGBDVisualizer::getDepthBuffer() const {
   return (uint16_t*)m_pDepthBuff;
 }
 
-void RGBDViewer::refreshWindow() {
+void RGBDVisualizer::refreshWindow() {
   updateTexture();
   render();
 }
 
-void RGBDViewer::updateTexture() {
+void RGBDVisualizer::updateTexture() {
   SDL_UpdateTexture(m_pTexture, &m_depthRect, (const void*)m_pDepthBuff, m_depthW * m_channel);
   SDL_UpdateTexture(m_pTexture, &m_colorRect, (const void*)m_pColorBuff, m_colorW * m_channel);
 }
 
-void RGBDViewer::render() {
+void RGBDVisualizer::render() {
   SDL_RenderClear(m_pRenderer);
   SDL_RenderCopy(m_pRenderer, m_pTexture, NULL, NULL);
   SDL_RenderPresent(m_pRenderer);
+}
+
+bool RGBDVisualizer::isStopped() const {
+  SDL_Event e;
+  if (SDL_PollEvent(&e)) {
+    switch (e.type) {
+    case SDL_QUIT:
+      return true;
+    case SDL_KEYUP:
+      switch (e.key.keysym.sym) {
+      case SDLK_ESCAPE:
+      case SDLK_q:
+	return true;
+      }
+    }
+  }
+  return false;
 }

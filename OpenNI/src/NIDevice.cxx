@@ -57,10 +57,16 @@ NIDevice::NIDevice()
   : device()
   , depthStream()
   , colorStream()
+  , depthFrame()
+  , colorFrame()
 {}
 
 NIDevice::~NIDevice() {
-
+  colorStream.stop();
+  colorStream.destroy();
+  depthStream.stop();
+  depthStream.destroy();
+  device.close();
 }
 
 void NIDevice::initDevice(int depthMode, int colorMode) {

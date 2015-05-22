@@ -3,7 +3,7 @@
 
 #include "SDL2/SDL.h"
 
-class RGBDViewer {
+class RGBDVisualizer {
   SDL_Window *m_pWindow;
   SDL_Texture *m_pTexture;
   SDL_Renderer *m_pRenderer;
@@ -23,16 +23,18 @@ class RGBDViewer {
 public:
   static void initSDL(Uint32 flag=SDL_INIT_VIDEO);
   static void quitSDL();
+  static SDL_Keysym getKeyPressed();
   
-  RGBDViewer(int depthW, int depthH, int colorW, int colorH);
-  ~RGBDViewer();
+  RGBDVisualizer(int depthW, int depthH, int colorW, int colorH);
+  ~RGBDVisualizer();
 
   void initWindow();
-  
-  uint8_t* getColorBuffer();
-  uint16_t* getDepthBuffer();
-
   void refreshWindow();
+  
+  uint8_t* getColorBuffer() const;
+  uint16_t* getDepthBuffer() const;
+
+  bool isStopped() const;
 };
 
 #endif
