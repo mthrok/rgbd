@@ -1,8 +1,7 @@
-// c++ test_window.cpp -I${OPENNI2_INCLUDE} -L${OPENNI2_REDIST} -lOpenNi2 -framework SDL2 
+// c++ test_window.cpp -lOpenNi2 -framework SDL2 -std=c++11
 #include <iostream>
 #include <string>
 
-#include "NIDevice.hpp"
 #include "OpenNI2/OpenNI.h"
 #include "SDL2/SDL.h"
 
@@ -52,22 +51,28 @@ int main(int argc, char *argv[]) {
   // Initialize SDL
   SDL_Init(SDL_INIT_VIDEO);
 
-  openni::Status rc;
   // Initialize OpenNI
-  NIDevice::initOpenNI();
+  openni::Status rc = openni::OpenNI::initialize();
+  if (rc != openni::STATUS_OK) {
+    printOpenNIError("Failed to initialize.");
+    return 1;
+  }
 
-  NIDevice nidevice;
-  // Open device
-  nidevice.connect();
-
+  // Get device
+  openni::Device device;
+  rc = device.open(openni::ANY_DEVICE);
+  if (rc != openni::STATUS_OK) {
+    printOpenNIError("Failed to open device.");
+    return 2;
+  }
   // Get depth stream
-  auto* s_info = nidevice.device.getSensorInfo(openni::SENSOR_DEPTH);
+  auto* s_info = device.getSensorInfo(openni::SENSOR_DEPTH);
   if (!s_info) {
     std::cout << "No depth sensor found.\n";
     return 3;
   }
   openni::VideoStream depth;
-  rc = depth.create(nidevice.device, openni::SENSOR_DEPTH);
+  rc = depth.create(device, openni::SENSOR_DEPTH);
   if (rc != openni::STATUS_OK) {
     printOpenNIError("Failed to create depth stream.");
     return 3;
@@ -85,13 +90,13 @@ int main(int argc, char *argv[]) {
   size_t depthW = mode.getResolutionX();
   size_t depthH = mode.getResolutionY();
   // Get color stream
-  s_info = nidevice.device.getSensorInfo(openni::SENSOR_COLOR);
+  s_info = device.getSensorInfo(openni::SENSOR_COLOR);
   if (!s_info) {
     std::cout << "No color sensor found.\n";
     return 3;
   }
   openni::VideoStream color;
-  rc = color.create(nidevice.device, openni::SENSOR_COLOR);
+  rc = color.create(device, openni::SENSOR_COLOR);
   if (rc != openni::STATUS_OK) {
     printOpenNIError("Failed to create color stream.");
     return 3;
@@ -110,8 +115,8 @@ int main(int argc, char *argv[]) {
   size_t colorH = mode.getResolutionY();
 
   // Set image registration mode
-  if (nidevice.device.isImageRegistrationModeSupported(openni::IMAGE_REGISTRATION_DEPTH_TO_COLOR)) {
-    rc = nidevice.device.setImageRegistrationMode(openni::IMAGE_REGISTRATION_DEPTH_TO_COLOR);
+  if (device.isImageRegistrationModeSupported(openni::IMAGE_REGISTRATION_DEPTH_TO_COLOR)) {
+    rc = device.setImageRegistrationMode(openni::IMAGE_REGISTRATION_DEPTH_TO_COLOR);
     if (rc != openni::STATUS_OK)
       printOpenNIError("Failed to set registration mode.\n");
   } else {
@@ -119,7 +124,7 @@ int main(int argc, char *argv[]) {
   }
 
   // Syncronyze depth and color
-  nidevice.device.setDepthColorSyncEnabled(true);
+  device.setDepthColorSyncEnabled(true);
   
   // Start depth stream
   rc = depth.start();
@@ -231,8 +236,7 @@ int main(int argc, char *argv[]) {
   SDL_DestroyRenderer(pRndr);
   SDL_DestroyWindow(pWin);
   SDL_Quit();
-  
-  NIDevice::quitOpenNI();
+
   return 0;
 }
 
