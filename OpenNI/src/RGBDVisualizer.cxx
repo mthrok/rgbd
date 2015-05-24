@@ -1,5 +1,6 @@
 #include "RGBDVisualizer.hpp"
 #include <string.h>
+#include <stdio.h>
 
 void RGBDVisualizer::initSDL(Uint32 flag) {
   SDL_Init(flag);
@@ -22,6 +23,7 @@ RGBDVisualizer::RGBDVisualizer(int depthW, int depthH, int colorW, int colorH)
   , m_channel(4)
   , m_pColorBuff(NULL)
   , m_pDepthBuff(NULL)
+  , m_windowTitle()
 {}
 
 RGBDVisualizer::~RGBDVisualizer() {
@@ -90,6 +92,18 @@ void RGBDVisualizer::render() {
   SDL_RenderClear(m_pRenderer);
   SDL_RenderCopy(m_pRenderer, m_pTexture, NULL, NULL);
   SDL_RenderPresent(m_pRenderer);
+}
+
+void RGBDVisualizer::setWindowTitle(const char* format, ...) const {
+  va_list argptr;
+  va_start(argptr, format);
+  vsnprintf((char *)m_windowTitle, MAX_WINDOW_TITLE_LENGTH, format, argptr);
+  va_end(argptr);
+  SDL_SetWindowTitle(m_pWindow, m_windowTitle);
+}
+
+void RGBDVisualizer::delay(Uint32 mSec) const {
+  SDL_Delay(mSec);
 }
 
 bool RGBDVisualizer::isStopped() const {
