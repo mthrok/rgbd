@@ -7,10 +7,10 @@ CXX = c++
 CFLAGS = -I$(IDIR) --std=c++11
 LIBS = -lOpenNi2 -framework SDL2
 
-_DEPS = RGBDVisualizer.hpp NIDevice.hpp
+_DEPS = RGBDVisualizer.hpp NIDevice.hpp io.hpp types.hpp
 DEPS = $(patsubst %,$(IDIR)/%,$(_DEPS))
 
-_OBJ = RGBDVisualizer.o NIDevice.o
+_OBJ = RGBDVisualizer.o NIDevice.o io.o
 OBJ = $(patsubst %,$(ODIR)/%,$(_OBJ))
 
 PROGRAMS = viewer recorder

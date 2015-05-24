@@ -10,7 +10,7 @@ void RGBDVisualizer::quitSDL() {
   SDL_Quit();
 }
 
-RGBDVisualizer::RGBDVisualizer(int depthW, int depthH, int colorW, int colorH)
+RGBDVisualizer::RGBDVisualizer(uint depthW, uint depthH, uint colorW, uint colorH)
   : m_pWindow(NULL)
   , m_pTexture(NULL)
   , m_pRenderer(NULL)
@@ -46,8 +46,8 @@ void RGBDVisualizer::initWindow() {
 
 void RGBDVisualizer::createWindow() {
   // Check the size
-  int width = m_depthW + m_colorW;
-  int height = (m_depthH > m_colorH) ? m_depthH : m_colorH;
+  uint width = m_depthW + m_colorW;
+  uint height = (m_depthH > m_colorH) ? m_depthH : m_colorH;
   // Create window, renderer and texture
   m_pWindow = SDL_CreateWindow("RGBDVisualizer", 0, 0, width, height, 0);
   m_pRenderer = SDL_CreateRenderer(m_pWindow, -1, SDL_RENDERER_ACCELERATED);
@@ -60,9 +60,9 @@ void RGBDVisualizer::createWindow() {
 }
 
 void RGBDVisualizer::createConversionBuffers() {
-  uint64_t nDepthPix = uint64_t(m_depthW) * m_depthH * m_channel;
-  uint64_t nColorPix = uint64_t(m_colorW) * m_colorH * m_channel;
-  m_pDepthBuff = (uint16_t *)new uint8_t[nDepthPix];
+  size_t nDepthPix = (size_t) m_depthW * m_depthH * m_channel;
+  size_t nColorPix = (size_t) m_colorW * m_colorH * m_channel;
+  m_pDepthBuff = new uint8_t[nDepthPix];
   m_pColorBuff = new uint8_t[nColorPix];
   //memset_s(m_pDepthBuff, nDepthPix, 0, nDepthPix);
   //memset_s(m_pColorBuff, nColorPix, 0, nColorPix);
@@ -71,11 +71,11 @@ void RGBDVisualizer::createConversionBuffers() {
 }
 
 uint8_t* RGBDVisualizer::getColorBuffer() const {
-  return (uint8_t*)m_pColorBuff;
+  return m_pColorBuff;
 }
 
-uint16_t* RGBDVisualizer::getDepthBuffer() const {
-  return (uint16_t*)m_pDepthBuff;
+uint8_t* RGBDVisualizer::getDepthBuffer() const {
+  return m_pDepthBuff;
 }
 
 void RGBDVisualizer::refreshWindow() {

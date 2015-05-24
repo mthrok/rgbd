@@ -1,6 +1,7 @@
-#ifndef __NIDEVICE_HPP__
-#define __NIDEVICE_HPP__
+#ifndef __OPENNI_INCLUDE_NIDEVICE_HPP__
+#define __OPENNI_INCLUDE_NIDEVICE_HPP__
 
+#include "types.hpp"
 #include "OpenNI2/OpenNI.h"
 
 const char * getPixelFormatString(const openni::PixelFormat& val);
@@ -32,8 +33,8 @@ public:
   void setDepthMode(const int i);
   void setColorMode(const int i);
   
-  void getDepthResolution(int& w, int& h) const;
-  void getColorResolution(int& w, int& h) const;
+  void getDepthResolution(uint& w, uint& h) const;
+  void getColorResolution(uint& w, uint& h) const;
 
   void setImageRegistration(const bool enable=true);
   void setDepthColorSync(const bool enable=true);
@@ -44,8 +45,11 @@ public:
   void readDepthStream();
   void readColorStream();
 
-  void copyDepthData(uint16_t* const pBuffer, int offset=1, int skip=1);
-  void copyColorData(uint8_t* const pBuffer, int offset=1, int skip=1);
+  void copyDepthFrame(uint16_t* const pBuffer, int offset=0, int padding=0);
+  void copyColorFrame(uint8_t* const pBuffer, int offset=0, int padding=0);
+  void convertDepthFrameToJet(uint8_t* pDst, const uint mode=1,
+			      const uint16_t v_min = DEFAULT_DEPTH_MIN,
+			      const uint16_t v_max = DEFAULT_DEPTH_MAX);
 
   void releaseDepthFrame();
   void releaseColorFrame();

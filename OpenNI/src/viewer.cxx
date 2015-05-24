@@ -10,14 +10,13 @@ void main_exec() {
   //nid.listAllSensorModes();
   
   // Get stream resolutions
-  int depthW = 0, depthH = 0;
-  int colorW = 0, colorH = 0;
+  uint depthW = 0, depthH = 0, colorW = 0, colorH = 0;
 
   nid.getDepthResolution(depthW, depthH);
   nid.getColorResolution(colorW, colorH);
 
   // Initialize visualizer
-  RGBDVisualizer visualizer{depthW, depthH, colorW, colorH};
+  RGBDVisualizer visualizer(depthW, depthH, colorW, colorH);
   visualizer.initWindow();
 
   // Start streams
@@ -32,8 +31,8 @@ void main_exec() {
     try {
       nid.readDepthStream();
       nid.readColorStream();
-      nid.copyDepthData(visualizer.getDepthBuffer());
-      nid.copyColorData(visualizer.getColorBuffer());
+      nid.convertDepthFrameToJet(visualizer.getDepthBuffer());
+      nid.copyColorFrame(visualizer.getColorBuffer(), 1, 1);
       nid.releaseDepthFrame();
       nid.releaseColorFrame();
     } catch(const std::runtime_error& e) {

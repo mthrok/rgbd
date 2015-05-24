@@ -1,4 +1,6 @@
 #include "NIDevice.hpp"
+#include "io.hpp"
+
 #include <stdexcept>
 #include <stdio.h>
 #include <string>
@@ -144,13 +146,13 @@ void NIDevice::setColorMode(const int i) {
     throw std::runtime_error("Failed to set depth mode.");
 }
 
-void NIDevice::getDepthResolution(int& w, int& h) const {
+void NIDevice::getDepthResolution(uint& w, uint& h) const {
   VideoMode mode = depthStream.getVideoMode();
   w = mode.getResolutionX();
   h = mode.getResolutionY();
 }
 
-void NIDevice::getColorResolution(int& w, int& h) const {
+void NIDevice::getColorResolution(uint& w, uint& h) const {
   VideoMode mode = colorStream.getVideoMode();
   w = mode.getResolutionX();
   h = mode.getResolutionY();
@@ -203,38 +205,26 @@ void NIDevice::readColorStream() {
     throw std::runtime_error("Failed to read depth frame.");
 }
 
-void NIDevice::copyDepthData(uint16_t* pBuffer, int offset, int skip) {
-  int width=0, height=0;
+void NIDevice::copyDepthFrame(uint16_t* pDst, int offset, int padding) {
+  uint width=0, height=0;
   getDepthResolution(width, height);
-
-  uint16_t* pDepth = (uint16_t*) depthFrame.getData();
-  pBuffer += offset;
-  for (int h=0; h<height; ++h) {
-    for (int w=0; w<width; ++w) {
-      for (int c=0; c<1; ++c) {
-	*pBuffer = *pDepth;
-	++pBuffer; ++pDepth;
-      }
-      pBuffer += skip;
-    }
-  }
+  const void *pSrc = static_cast<const void *>(depthFrame.getData());
+  copyFrame(pSrc, pDst, width, height, 2, offset, padding);
 }
 
-void NIDevice::copyColorData(uint8_t* pBuffer, int offset, int skip) {
-  int width=0, height=0;
+void NIDevice::copyColorFrame(uint8_t* pDst, int offset, int padding) {
+  uint width=0, height=0;
   getColorResolution(width, height);
-  
-  uint8_t* pColor = (uint8_t*) colorFrame.getData();
-  pBuffer += offset;
-  for (int h=0; h<height; ++h) {
-    for (int w=0; w<width; ++w) {
-      for (int c=0; c<3; ++c) {
-	*pBuffer = *pColor;
-	++pBuffer; ++ pColor;
-      }
-      pBuffer += skip;
-    }
-  }
+  const void *pSrc = static_cast<const void *>(colorFrame.getData());
+  copyFrame(pSrc, pDst, width, height, 3, offset, padding);
+}
+
+void NIDevice::convertDepthFrameToJet(uint8_t* pDst, const uint mode,
+				      const uint16_t v_min, const uint16_t v_max){
+  uint width=0, height=0;
+  getDepthResolution(width, height);
+  const uint16_t *pSrc = static_cast<const uint16_t *>(depthFrame.getData());
+  convertDepthToJet(pSrc, pDst, width, height, mode, v_min, v_max);
 }
 
 void NIDevice::releaseDepthFrame() {
