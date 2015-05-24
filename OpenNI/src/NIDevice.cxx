@@ -35,7 +35,7 @@ const char * getPixelFormatString(const PixelFormat& val) {
 void printSupportedVideoModes(const SensorInfo* info) {
   auto& mode = info->getSupportedVideoModes();
   for (int i=0; i<mode.getSize(); ++i) {
-    printf("%15s: %d\n", "Depth Mode", i);
+    printf("%15s: %d\n", "Video Mode", i);
     printf("  %13s: %d\n", "Width", mode[i].getResolutionX());
     printf("  %13s: %d\n", "Height", mode[i].getResolutionY());
     printf("  %13s: %d\n", "FPS", mode[i].getFps());
@@ -75,8 +75,8 @@ void NIDevice::initDevice(int depthMode, int colorMode) {
   openDevice();
   createDepthStream();
   createColorStream();
-  setDepthMode(0);
-  setColorMode(0);
+  setDepthMode(depthMode);
+  setColorMode(colorMode);
   setImageRegistration();
   setDepthColorSync();
 }

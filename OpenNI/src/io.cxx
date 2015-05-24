@@ -17,6 +17,7 @@ void jet(const uint16_t val, uint8_t& R, uint8_t& G, uint8_t& B,
     R = G = B = 255;
     return;
   }
+  double r = ((double)val - v_min) / (v_max - v_min);
   // MATLAB Jet style
   /*
   if (r < 0.125) {
@@ -40,9 +41,8 @@ void jet(const uint16_t val, uint8_t& R, uint8_t& G, uint8_t& B,
     G = 0;
     B = 0;
   }
-  */  
+  */
   // Smoother version
-  double r = ((double)val - v_min) / (v_max - v_min);
   R = (uint8_t) (255 * (cos((r + 1.0) * M_PI) + 1) / 2.0);
   B = (uint8_t) (255 * (cos((r + 0.0) * M_PI) + 1) / 2.0);
   G = (uint8_t) (255 * (cos((r - 0.5) * M_PI) + 0) / 1.0);

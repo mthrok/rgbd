@@ -4,9 +4,12 @@
 #include <stdio.h>
 #include <stdexcept>
 
+uint nFrames = 15000;
+int depthMode=4, colorMode=9;
+
 void main_exec() {
   NIDevice nid;
-  nid.initDevice();
+  nid.initDevice(depthMode, colorMode);
   //nid.listAllSensorModes();
   
   // Get stream resolutions
