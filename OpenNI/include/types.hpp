@@ -3,8 +3,12 @@
 
 typedef unsigned int uint;
 
-// EFFECTIVE DEPTH RANGE [mm]
-#define DEFAULT_DEPTH_MIN 1
-#define DEFAULT_DEPTH_MAX 4000
+// EFFECTIVE DEPTH RANGE   [mm]
+#define DEFAULT_DEPTH_MIN   800
+#define DEFAULT_DEPTH_MAX 10000
+
+// EDDECTIVE IR VALUE RANGE
+#define DEFAULT_IR_MIN 0
+#define DEFAULT_IR_MAX 1024
 
 #endif

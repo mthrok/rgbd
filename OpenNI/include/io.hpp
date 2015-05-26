@@ -22,13 +22,18 @@ void jet(const uint16_t val, uint8_t& R, uint8_t& G, uint8_t& B,
 	 const uint16_t v_max = DEFAULT_DEPTH_MAX);
 
 //!
-//! @param mode Inidicates the alignment of output buffer.
+//! Convert depth frame (16 bit 1 ch) to RGB frame (8bit 3ch) using jet
+//! colormap.
+//! @param format Inidicates the alignment of output buffer.
 //!   1: ARGB == SDL_PIXELFORMAT_BGRA8888
+//! @param v_min Minimum value to trancate. Unit: [mm]
+//! @param v_max Maximum value to trancate. Unit: [mm]
 //!
-void convertDepthToJet(const uint16_t* pSrc, uint8_t* pDst,
-		       const uint width, const uint height, const uint mode=1,
-		       const uint16_t v_min = DEFAULT_DEPTH_MIN,
-		       const uint16_t v_max = DEFAULT_DEPTH_MAX);
+void convert16BitFrameToJet(const uint16_t* pSrc, uint8_t* pDst,
+			    const uint width, const uint height,
+			    const uint format=1,
+			    const uint16_t v_min = DEFAULT_DEPTH_MIN,
+			    const uint16_t v_max = DEFAULT_DEPTH_MAX);
 
 
 //!
@@ -88,7 +93,8 @@ public:
   
   void copyDepthFrameTo(uint16_t* pDst, int iFrame=-1, uint offset=0, uint padding=0);
   void copyColorFrameTo(uint8_t* pDst, int iFrame=-1, uint offset=0, uint padding=0);
-  void convertDepthFrameToJet(uint8_t* pDst, int iFrame, const uint mode=1,
+  void convertDepthFrameToJet(uint8_t* pDst, int iFrame,
+			      const uint color_format=1,
 			      const uint16_t v_min = DEFAULT_DEPTH_MIN,
 			      const uint16_t v_max = DEFAULT_DEPTH_MAX);
 

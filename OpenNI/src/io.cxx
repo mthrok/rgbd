@@ -1,12 +1,9 @@
 #include "io.hpp"
-
 #include <cmath>
 
-/*
-double interpolate(double val, double x0, double x1, double y0, double y1) {
-  return (val-x0) * (y1-y0) / (x1-x0) + y0;
-}
-*/
+//double interpolate(double val, double x0, double x1, double y0, double y1) {
+//  return (val-x0) * (y1-y0) / (x1-x0) + y0;
+//}
 
 void jet(const uint16_t val, uint8_t& R, uint8_t& G, uint8_t& B,
 	 const uint16_t v_min, const uint16_t v_max) {
@@ -19,6 +16,7 @@ void jet(const uint16_t val, uint8_t& R, uint8_t& G, uint8_t& B,
   }
   double r = ((double)val - v_min) / (v_max - v_min);
   // MATLAB Jet style
+  // http://stackoverflow.com/questions/7706339/grayscale-to-red-green-blue-matlab-jet-color-scale
   /*
   if (r < 0.125) {
     R = 0;
@@ -53,9 +51,9 @@ void jet(const uint16_t val, uint8_t& R, uint8_t& G, uint8_t& B,
     B = 0;
 }
 
-void convertDepthToJet(const uint16_t* pSrc, uint8_t* pDst,
-		       const uint width, const uint height, const uint mode,
-		       const uint16_t v_min, const uint16_t v_max) {
+void convert16BitFrameToJet(const uint16_t* pSrc, uint8_t* pDst,
+			    const uint width, const uint height, const uint mode,
+			    const uint16_t v_min, const uint16_t v_max) {
   uint8_t R=0, G=1, B=2, channel=3;
   switch (mode) {
   case 1: // ARGB == SDL_PIXELFORMAT_BGRA8888
@@ -65,7 +63,6 @@ void convertDepthToJet(const uint16_t* pSrc, uint8_t* pDst,
   default:
     break;
   }
-
   for (uint h=0; h<height; ++h) {
     for (uint w=0; w<width; ++w) {
       jet(*pSrc, pDst[R], pDst[G], pDst[B], v_min, v_max);
@@ -208,9 +205,9 @@ void RGBDFrames::copyColorFrameTo(uint8_t* pDst, int iFrame,
 };
 
 void RGBDFrames::convertDepthFrameToJet(uint8_t* pDst, int iFrame,
-    const uint mode, const uint16_t v_min, const uint16_t v_max) {
+    const uint color_format, const uint16_t v_min, const uint16_t v_max) {
   uint width = m_depthFrames.getWidth();
   uint height = m_depthFrames.getHeight();
   const uint16_t *pSrc = getDepthFrame(iFrame);
-  convertDepthToJet(pSrc, pDst, width, height, mode, v_min, v_max);
+  convert16BitFrameToJet(pSrc, pDst, width, height, color_format, v_min, v_max);
 }

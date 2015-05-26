@@ -59,11 +59,15 @@ NIDevice::NIDevice()
   : device()
   , depthStream()
   , colorStream()
+  , IRStream()
   , depthFrame()
   , colorFrame()
+  , IRFrame()
 {}
 
 NIDevice::~NIDevice() {
+  IRStream.stop();
+  IRStream.destroy();
   colorStream.stop();
   colorStream.destroy();
   depthStream.stop();
@@ -71,14 +75,24 @@ NIDevice::~NIDevice() {
   device.close();
 }
 
-void NIDevice::initDevice(int depthMode, int colorMode) {
+void NIDevice::initDevice(int depthMode, int colorMode, int IRMode) {
   openDevice();
-  createDepthStream();
-  createColorStream();
-  setDepthMode(depthMode);
-  setColorMode(colorMode);
-  setImageRegistration();
-  setDepthColorSync();
+  if (-1 < depthMode) {
+    createDepthStream();
+    setDepthMode(depthMode);
+  }
+  if (-1 < colorMode) {
+    createColorStream();
+    setColorMode(colorMode);
+  }
+  if (-1 < IRMode) {
+    createIRStream();
+    setIRMode(IRMode);
+  }
+  if (-1 < depthMode && -1 < colorMode) {
+    setImageRegistration();
+    setDepthColorSync();
+  }
 }
 
 void NIDevice::openDevice(const char* uri) {
@@ -108,7 +122,7 @@ void NIDevice::listAllSensorModes() {
 
 void NIDevice::createDepthStream() {
   if (device.getSensorInfo(SENSOR_DEPTH)) {
-    if (openni::STATUS_OK != depthStream.create(device, openni::SENSOR_DEPTH)) 
+    if (STATUS_OK != depthStream.create(device, SENSOR_DEPTH))
       throw std::runtime_error("Failed to create depth stream.");
   } else {
     throw std::runtime_error("No depth sensor found in the device.");
@@ -117,33 +131,53 @@ void NIDevice::createDepthStream() {
 
 void NIDevice::createColorStream() {
   if (device.getSensorInfo(SENSOR_COLOR)) {
-    if (openni::STATUS_OK != colorStream.create(device, openni::SENSOR_COLOR))
+    if (STATUS_OK != colorStream.create(device, SENSOR_COLOR))
       throw std::runtime_error("Failed to create color stream.");
   } else {
     throw std::runtime_error("No color sensor found in the device.");
   }
 }
 
+void NIDevice::createIRStream() {
+  if (device.getSensorInfo(SENSOR_IR)) {
+    if (STATUS_OK != IRStream.create(device, SENSOR_IR))
+      throw std::runtime_error("Failed to create IR stream.");
+  } else {
+    throw std::runtime_error("No IR sensor found in the device.");
+  }
+}
+
 void NIDevice::setDepthMode(const int i) {
-  auto* info = device.getSensorInfo(openni::SENSOR_DEPTH);
+  auto* info = device.getSensorInfo(SENSOR_DEPTH);
   if (!info)
     throw std::runtime_error("No depth sensor in the device");
   auto& modes  = info->getSupportedVideoModes();
   if (i > modes.getSize())
     throw std::runtime_error("Invliad depth mode was given.");
-  if (openni::STATUS_OK != depthStream.setVideoMode(modes[i]))
+  if (STATUS_OK != depthStream.setVideoMode(modes[i]))
     throw std::runtime_error("Failed to set depth mode.");
 }
 
 void NIDevice::setColorMode(const int i) {
-  auto* info = device.getSensorInfo(openni::SENSOR_COLOR);
+  auto* info = device.getSensorInfo(SENSOR_COLOR);
   if (!info)
-    throw std::runtime_error("No depth sensor in the device");
+    throw std::runtime_error("No color sensor in the device");
   auto& modes  = info->getSupportedVideoModes();
   if (i > modes.getSize())
-    throw std::runtime_error("Invliad depth mode was given.");
-  if (openni::STATUS_OK != colorStream.setVideoMode(modes[i]))
-    throw std::runtime_error("Failed to set depth mode.");
+    throw std::runtime_error("Invliad color mode was given.");
+  if (STATUS_OK != colorStream.setVideoMode(modes[i]))
+    throw std::runtime_error("Failed to set color mode.");
+}
+
+void NIDevice::setIRMode(const int i) {
+  auto* info = device.getSensorInfo(SENSOR_IR);
+  if (!info)
+    throw std::runtime_error("No IR sensor in the device");
+  auto& modes  = info->getSupportedVideoModes();
+  if (i > modes.getSize())
+    throw std::runtime_error("Invliad IR mode was given.");
+  if (STATUS_OK != IRStream.setVideoMode(modes[i]))
+    throw std::runtime_error("Failed to set IR mode.");
 }
 
 void NIDevice::getDepthResolution(uint& w, uint& h) const {
@@ -156,6 +190,23 @@ void NIDevice::getColorResolution(uint& w, uint& h) const {
   VideoMode mode = colorStream.getVideoMode();
   w = mode.getResolutionX();
   h = mode.getResolutionY();
+}
+
+void NIDevice::getIRResolution(uint& w, uint& h) const {
+  VideoMode mode = IRStream.getVideoMode();
+  w = mode.getResolutionX();
+  h = mode.getResolutionY();
+}
+
+uint NIDevice::getIRChannel() const {
+  PixelFormat format = IRStream.getVideoMode().getPixelFormat();
+  switch (format) {
+  case PIXEL_FORMAT_RGB888:
+    return 3;
+  case PIXEL_FORMAT_GRAY16:
+  default:
+    return 1;
+  }
 }
 
 void NIDevice::setImageRegistration(const bool enable) {
@@ -178,13 +229,18 @@ void NIDevice::setDepthColorSync(const bool enable) {
 }
 
 void NIDevice::startDepthStream() {
-  if (openni::STATUS_OK != depthStream.start())
+  if (STATUS_OK != depthStream.start())
     throw std::runtime_error("Failed to start depth stream.");
 }
 
 void NIDevice::startColorStream() {
-  if (openni::STATUS_OK != colorStream.start())
+  if (STATUS_OK != colorStream.start())
     throw std::runtime_error("Failed to start color stream.");
+}
+
+void NIDevice::startIRStream() {
+  if (STATUS_OK != IRStream.start())
+    throw std::runtime_error("Failed to start IR stream.");
 }
 
 void NIDevice::readDepthStream() {
@@ -200,9 +256,18 @@ void NIDevice::readColorStream() {
   int dummy = 0;
   VideoStream* pStream = &colorStream;
   if (STATUS_OK != OpenNI::waitForAnyStream(&pStream, 1, &dummy, WAIT_TIMEOUT))
-    throw std::runtime_error("Depth stream timeout.");
+    throw std::runtime_error("Color stream timeout.");
   if (STATUS_OK != colorStream.readFrame(&colorFrame))
-    throw std::runtime_error("Failed to read depth frame.");
+    throw std::runtime_error("Failed to read color frame.");
+}
+
+void NIDevice::readIRStream() {
+  int dummy = 0;
+  VideoStream* pStream = &IRStream;
+  if (STATUS_OK != OpenNI::waitForAnyStream(&pStream, 1, &dummy, WAIT_TIMEOUT))
+    throw std::runtime_error("IR stream timeout.");
+  if (STATUS_OK != IRStream.readFrame(&IRFrame))
+    throw std::runtime_error("Failed to read IR frame.");
 }
 
 void NIDevice::copyDepthFrame(uint16_t* pDst, int offset, int padding) {
@@ -219,12 +284,31 @@ void NIDevice::copyColorFrame(uint8_t* pDst, int offset, int padding) {
   copyFrame(pSrc, pDst, width, height, 3, offset, padding);
 }
 
-void NIDevice::convertDepthFrameToJet(uint8_t* pDst, const uint mode,
+void NIDevice::copyIRFrame(uint8_t* const pDst, int offset, int padding) {
+  uint width=0, height=0;
+  getIRResolution(width, height);
+  const void *pSrc = static_cast<const void *>(IRFrame.getData());
+  copyFrame(pSrc, pDst, width, height, 3, offset, padding);
+}
+
+void NIDevice::convertDepthFrameToJet(uint8_t* pDst, const uint color_format,
 				      const uint16_t v_min, const uint16_t v_max){
   uint width=0, height=0;
   getDepthResolution(width, height);
   const uint16_t *pSrc = static_cast<const uint16_t *>(depthFrame.getData());
-  convertDepthToJet(pSrc, pDst, width, height, mode, v_min, v_max);
+  // Modification for PIXEL_FORMAT_DEPTH_100_UM
+  uint16_t c = 1;
+  if (PIXEL_FORMAT_DEPTH_100_UM == depthStream.getVideoMode().getPixelFormat())
+    c = 100;
+  convert16BitFrameToJet(pSrc, pDst, width, height, color_format, v_min*c, v_max*c);
+}
+
+void NIDevice::convertIRFrameToJet(uint8_t* pDst, const uint color_format,
+				   const uint16_t v_min, const uint16_t v_max){
+  uint width=0, height=0;
+  getIRResolution(width, height);
+  const uint16_t *pSrc = static_cast<const uint16_t *>(IRFrame.getData());
+  convert16BitFrameToJet(pSrc, pDst, width, height, color_format, v_min, v_max);
 }
 
 void NIDevice::releaseDepthFrame() {
@@ -233,4 +317,8 @@ void NIDevice::releaseDepthFrame() {
 
 void NIDevice::releaseColorFrame() {
   colorFrame.release();
+}
+
+void NIDevice::releaseIRFrame() {
+  IRFrame.release();
 }
