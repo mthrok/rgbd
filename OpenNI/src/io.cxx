@@ -43,9 +43,14 @@ void jet(const uint16_t val, uint8_t& R, uint8_t& G, uint8_t& B,
   }
   */
   // Smoother version
-  R = (uint8_t) (255 * (cos((r + 1.0) * M_PI) + 1) / 2.0);
-  B = (uint8_t) (255 * (cos((r + 0.0) * M_PI) + 1) / 2.0);
-  G = (uint8_t) (255 * (cos((r - 0.5) * M_PI) + 0) / 1.0);
+  double t = 2.0 * M_PI * r;
+  R = (uint8_t) (255 * (-sin(t) + 1.0) / 2.0);
+  B = (uint8_t) (255 * ( sin(t) + 1.0) / 2.0);
+  G = (uint8_t) (255 * (-cos(t) + 1.0) / 2.0);
+  if (r < 0.25)
+    R = 0;
+  if (r > 0.75)
+    B = 0;
 }
 
 void convertDepthToJet(const uint16_t* pSrc, uint8_t* pDst,
