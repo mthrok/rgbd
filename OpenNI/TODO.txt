@@ -3,3 +3,7 @@ Add event handler to visualizer.
 Add recorder I/O and user input handler to recorder.
 
 Add FPS to window
+
+Make RGBDFrame more flexible
+
+Add multithreading to NIDevice

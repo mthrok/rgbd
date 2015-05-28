@@ -1,5 +1,6 @@
 #include "io.hpp"
 #include <cmath>
+#include <stdexcept>
 
 //double interpolate(double val, double x0, double x1, double y0, double y1) {
 //  return (val-x0) * (y1-y0) / (x1-x0) + y0;
@@ -88,14 +89,11 @@ void copyFrame(const void* pSrc, void* pDst,
   }
 }
 
-
-
-
-Frames::Frames(uint width, uint height, uint BPP, uint nFrames)
-  : m_width(width)
-  , m_height(height)
-  , m_BPP(BPP)
-  , m_nFrames(nFrames)
+Frames::Frames()
+  : m_width(0)
+  , m_height(0)
+  , m_BPP(0)
+  , m_nFrames(0)
   , m_currentFrame(0)
   , m_pBuffer(NULL)
 {}
@@ -109,7 +107,10 @@ void Frames::deallocate() {
   m_pBuffer = NULL;
 }
 
-void Frames::allocate() {
+void Frames::allocate(uint width, uint height, uint BPP, uint nFrames) {
+  if (nFrames == 0)
+    throw std::runtime_error("#Frames cannnot be 0.");
+  m_width = width; m_height = height; m_BPP = BPP; m_nFrames = nFrames;
   deallocate();
   size_t buffersize = size_t(m_nFrames) * m_width * m_height * m_BPP;
   m_pBuffer = static_cast<void *>(new uint8_t[buffersize]);
@@ -147,10 +148,9 @@ void Frames::copyFrameTo(void* pDst, int iFrame, int offset, int padding) {
   copyFrame(pSrc, pDst, m_width, m_height, m_BPP, offset, padding);
 }
 
-RGBDFrames::RGBDFrames(uint depthW, uint depthH,
-		       uint colorW, uint colorH, uint nFrames)
-  : m_depthFrames(depthW, depthH, 2, nFrames)
-  , m_colorFrames(colorW, colorH, 3, nFrames)
+RGBDFrames::RGBDFrames()
+  : m_depthFrames()
+  , m_colorFrames()
 {}
 
 RGBDFrames::~RGBDFrames() {
@@ -162,10 +162,9 @@ void RGBDFrames::deallocate() {
   m_colorFrames.deallocate();
 }
 
-void RGBDFrames::allocate() {
-  deallocate();
-  m_depthFrames.allocate();
-  m_colorFrames.allocate();
+void RGBDFrames::allocate(uint depthW, uint depthH, uint colorW, uint colorH, uint nFrames) {
+  m_depthFrames.allocate(depthW, depthH, 2, nFrames);
+  m_colorFrames.allocate(colorW, colorH, 3, nFrames);
 }
 
 uint RGBDFrames::getNumFrames() {
@@ -204,10 +203,12 @@ void RGBDFrames::copyColorFrameTo(uint8_t* pDst, int iFrame,
   m_colorFrames.copyFrameTo(pDst, iFrame, offset, padding);
 };
 
-void RGBDFrames::convertDepthFrameToJet(uint8_t* pDst, int iFrame,
-    const uint color_format, const uint16_t v_min, const uint16_t v_max) {
+void RGBDFrames::convert16BitFrameToJet(uint8_t* pDst, int iFrame,
+					const uint16_t v_min,
+					const uint16_t v_max,
+					const uint color_format) {
   uint width = m_depthFrames.getWidth();
   uint height = m_depthFrames.getHeight();
   const uint16_t *pSrc = getDepthFrame(iFrame);
-  convert16BitFrameToJet(pSrc, pDst, width, height, color_format, v_min, v_max);
+  ::convert16BitFrameToJet(pSrc, pDst, width, height, color_format, v_min, v_max);
 }

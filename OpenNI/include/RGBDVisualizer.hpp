@@ -33,10 +33,10 @@ public:
   static void quitSDL();
   static SDL_Keysym getKeyPressed();
 
-  RGBDVisualizer(uint depthW, uint depthH, uint colorW, uint colorH);
+  RGBDVisualizer();
   ~RGBDVisualizer();
 
-  void initWindow();
+  void initWindow(uint depthW, uint depthH, uint colorW, uint colorH);
   void refreshWindow();
   
   uint8_t* getColorBuffer() const;

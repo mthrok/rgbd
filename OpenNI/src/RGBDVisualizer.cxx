@@ -10,16 +10,16 @@ void RGBDVisualizer::quitSDL() {
   SDL_Quit();
 }
 
-RGBDVisualizer::RGBDVisualizer(uint depthW, uint depthH, uint colorW, uint colorH)
+RGBDVisualizer::RGBDVisualizer()
   : m_pWindow(NULL)
   , m_pTexture(NULL)
   , m_pRenderer(NULL)
   , m_depthRect()
   , m_colorRect()
-  , m_depthW(depthW)
-  , m_depthH(depthH)
-  , m_colorW(colorW)
-  , m_colorH(colorH)
+  , m_depthW(0)
+  , m_depthH(0)
+  , m_colorW(0)
+  , m_colorH(0)
   , m_channel(4)
   , m_pColorBuff(NULL)
   , m_pDepthBuff(NULL)
@@ -39,7 +39,9 @@ RGBDVisualizer::~RGBDVisualizer() {
     delete[] m_pColorBuff;
 }
 
-void RGBDVisualizer::initWindow() {
+void RGBDVisualizer::initWindow(uint depthW, uint depthH, uint colorW, uint colorH) {
+  m_depthW = depthW; m_depthH = depthH;
+  m_colorW = colorW; m_colorH = colorH;
   createWindow();
   createConversionBuffers();
 }
@@ -52,7 +54,8 @@ void RGBDVisualizer::createWindow() {
   m_pWindow = SDL_CreateWindow("RGBDVisualizer", 0, 0, width, height, 0);
   m_pRenderer = SDL_CreateRenderer(m_pWindow, -1, SDL_RENDERER_ACCELERATED);
   m_pTexture = SDL_CreateTexture(m_pRenderer,
-    SDL_PIXELFORMAT_BGRA8888, SDL_TEXTUREACCESS_STREAMING, width, height);
+
+				 SDL_PIXELFORMAT_BGRA8888, SDL_TEXTUREACCESS_STREAMING, width, height);
   // Create region mask
   m_depthRect.x = m_depthRect.y = m_colorRect.y = 0;
   m_depthRect.w = m_colorRect.x = m_depthW; m_depthRect.h = m_depthH;

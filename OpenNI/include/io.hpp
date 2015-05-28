@@ -57,11 +57,11 @@ class Frames {
   void *m_pBuffer;
 
 public:
-  Frames(uint width=0, uint height=0, uint BPP=4, uint nFrames=0);
+  Frames();
   ~Frames();
 
   void deallocate();
-  void allocate();
+  void allocate(uint width=0, uint height=0, uint BPP=4, uint nFrames=0);
 
   uint getWidth();
   uint getHeight();
@@ -77,11 +77,11 @@ public:
 class RGBDFrames {
   Frames m_depthFrames, m_colorFrames;
 public:
-  RGBDFrames(uint depthW, uint depthH, uint colorW, uint colorH, uint nFrames);
+  RGBDFrames();
   ~RGBDFrames();
   
   void deallocate();
-  void allocate();
+  void allocate(uint depthW, uint depthH, uint colorW, uint colorH, uint nFrames);
 
   uint getNumFrames();
   void incrementFrameIndex();
@@ -93,11 +93,9 @@ public:
   
   void copyDepthFrameTo(uint16_t* pDst, int iFrame=-1, uint offset=0, uint padding=0);
   void copyColorFrameTo(uint8_t* pDst, int iFrame=-1, uint offset=0, uint padding=0);
-  void convertDepthFrameToJet(uint8_t* pDst, int iFrame,
-			      const uint color_format=1,
-			      const uint16_t v_min = DEFAULT_DEPTH_MIN,
-			      const uint16_t v_max = DEFAULT_DEPTH_MAX);
-
+  void convert16BitFrameToJet(uint8_t* pDst, int iFrame,
+			      const uint16_t v_min, const uint16_t v_max,
+			      const uint color_format=1);
 };
 
 
