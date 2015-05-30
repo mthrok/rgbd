@@ -1,6 +1,7 @@
 #include "NIDevice.hpp"
 #include "RGBDVisualizer.hpp"
 
+#include <thread>
 #include <string>
 #include <stdexcept>
 
@@ -48,21 +49,21 @@ void view(int depthMode, int colorMode, int IRMode=-1) {
   }
 
   nid.startAllStreams();
+  // TODO INcoorperate atomic flag??
+  std::this_thread::sleep_for(std::chrono::milliseconds(500));
   while (1) {
     try {
-      nid.getAllFrames();
       if (-1 < IRMode) {
 	if (3 == cIR)
 	  nid.copyIRFrame(visualizer.getColorBuffer(), 1, 1);
 	else
-	  nid.convertIRFrameToJet(visualizer.getColorBuffer());
+	  nid.copyIRFrame(visualizer.getColorBuffer(), 1, 2);
       } else {
 	if (-1 < colorMode)
 	  nid.copyColorFrame(visualizer.getColorBuffer(), 1, 1);
 	if (-1 < depthMode)
-	  nid.convertDepthFrameToJet(visualizer.getDepthBuffer(), 1, minDepth, maxDepth);
+	  nid.copyDepthFrame(visualizer.getDepthBuffer(), 1, 2);
       }
-      nid.releaseAllFrames();
     } catch(const std::runtime_error& e) {
       printf("%s\n", e.what());
     }

@@ -1,9 +1,10 @@
 #include "NIDevice.hpp"
 #include "io.hpp"
 
-#include <stdexcept>
+
 #include <cstdio>
-#include <string>
+
+
 
 #define WAIT_TIMEOUT 500 // [ms]
 
@@ -41,10 +42,150 @@ void printSupportedVideoModes(const SensorInfo* info) {
   printf("\n");
 }
 
+RuntimeError::RuntimeError (std::string fn, std::string msg)
+  : m_message( fn + " : " + msg)
+{};
+
+const char* RuntimeError::what() const throw () {
+  return m_message.c_str();
+}
+
+
+NIDevice::Streamer::Streamer()
+  : m_stream()
+  , m_frame()
+  , m_listener()
+{};
+
+NIDevice::Streamer::~Streamer() {
+  if (m_frame.isValid())
+    m_frame.release();
+  if (m_stream.isValid()) {
+    m_stream.stop();
+    m_stream.destroy();
+  }
+}
+
+void NIDevice::Streamer::create(Device &device, const SensorType type,
+				const int mode, const bool mirroring) {
+  const openni::SensorInfo* info = device.getSensorInfo(type);
+  if (!info)
+    throw RuntimeError(__func__, "No sensor for the specified type found.");
+
+  if (STATUS_OK != m_stream.create(device, type))
+    throw RuntimeError(__func__, "Failed to create new stream.");
+
+  auto& videomodes = info->getSupportedVideoModes();
+  if (mode < 0 || videomodes.getSize() <= mode)
+    throw RuntimeError(__func__, "Invalid video mode was given.");
+
+  if (STATUS_OK != m_stream.setVideoMode(videomodes[mode]))
+    throw RuntimeError(__func__, "Failed to set video mode.");
+
+  if (mirroring != m_stream.getMirroringEnabled()){
+    if (STATUS_OK != m_stream.setMirroringEnabled(mirroring))
+      throw RuntimeError(__func__, "Failed to set mirroring mode.");
+  }
+
+  m_listener.setCallbackFcn([=](){
+      std::lock_guard<std::mutex> _(m_frameMutex);
+      if (m_frame.isValid())
+	m_frame.release();
+      if (STATUS_OK != m_stream.readFrame(&m_frame))
+	throw RuntimeError(__func__, "Failed to read frame.");
+    });
+  if (STATUS_OK != m_stream.addNewFrameListener(&m_listener)) {
+    throw RuntimeError(__func__, "Failed to add event listener.");
+  }
+}
+
+bool NIDevice::Streamer::isValid() const {
+  return m_stream.isValid();
+};
+
+uint NIDevice::Streamer::getWidth() const {
+  if (!m_stream.isValid())
+    throw RuntimeError(__func__, "Video stream is not initialized.");
+  return m_stream.getVideoMode().getResolutionX();
+}
+
+uint NIDevice::Streamer::getHeight() const {
+  if (!m_stream.isValid())
+    throw RuntimeError(__func__, "Video stream is not initialized.");
+  return m_stream.getVideoMode().getResolutionY();
+}
+
+uint NIDevice::Streamer::getNumChannels() const {
+  PixelFormat format = m_stream.getVideoMode().getPixelFormat();
+  switch (format) {
+  case PIXEL_FORMAT_DEPTH_1_MM:
+  case PIXEL_FORMAT_DEPTH_100_UM:
+  case PIXEL_FORMAT_GRAY8:
+  case PIXEL_FORMAT_GRAY16:
+    return 1;
+  case PIXEL_FORMAT_RGB888:
+  case PIXEL_FORMAT_YUV422:
+    return 3;
+  default:
+    throw std::logic_error("Not implemented for this video mode.");
+  }
+}
+
+uint NIDevice::Streamer::getMinValue() const {
+  if (!m_stream.isValid())
+    throw RuntimeError(__func__, "Video stream is not initialized.");
+  return m_stream.getMinPixelValue();
+}
+
+uint NIDevice::Streamer::getMaxValue() const {
+  if (!m_stream.isValid())
+    throw RuntimeError(__func__, "Video stream is not initialized.");
+  return m_stream.getMaxPixelValue();
+}
+
+void NIDevice::Streamer::start() {
+  if (!m_stream.isValid())
+    throw RuntimeError(__func__, "Video stream is not initialized.");
+
+  if (STATUS_OK != m_stream.start()) {
+    throw RuntimeError(__func__, "Faild to start stream.");
+  }
+};
+
+void NIDevice::Streamer::stop() {
+  if (!m_stream.isValid())
+    throw RuntimeError(__func__, "Stream is not initialized.");
+  m_stream.stop();
+}
+
+void NIDevice::Streamer::copyTo(void* pDst, const uint offset, const uint padding) {
+  std::lock_guard<std::mutex> _(m_frameMutex);
+  uint width = m_frame.getWidth();
+  uint height = m_frame.getHeight();
+  uint BPP = m_frame.getStrideInBytes() / width;
+  const void *pSrc = static_cast<const void *>(m_frame.getData());
+  ::copyFrame(pSrc, pDst, width, height, BPP, offset, padding);
+}
+
+NIDevice::Streamer::Listener::Listener()
+  : m_callbackFcn()
+{};
+
+NIDevice::Streamer::Listener::~Listener() {
+};
+
+void NIDevice::Streamer::Listener::onNewFrame (VideoStream &stream) {
+  m_callbackFcn();
+};
+
+void NIDevice::Streamer::Listener::setCallbackFcn(std::function<void()> fcn) {
+  m_callbackFcn = fcn;
+};
+
 void NIDevice::initONI() {
   Status rc = OpenNI::initialize();
   if (rc != STATUS_OK)
-    throw std::runtime_error("Failed to initialize OpenNI.");  
+    throw RuntimeError(__func__, "Failed to initialize OpenNI.");
 }
 
 void NIDevice::quitONI() {
@@ -52,71 +193,44 @@ void NIDevice::quitONI() {
 }
 
 NIDevice::NIDevice()
-  : device()
-  , streams()
-  , frames()
-  , frame_mutex()    
+  : m_device()
+  , m_streamers()
 {}
 
 NIDevice::~NIDevice() {
-  if (device.isValid()) {
-    for (auto& stream: streams) {
-      if (stream.isValid()) {
-	stream.stop();
-	stream.destroy();
-      }
-    }
-    device.close();
-  }
+  if (m_device.isValid())
+    m_device.close();
 }
 
 void NIDevice::openDevice(const char* uri) {
-  if (!device.isValid()) {
-    if (STATUS_OK != device.open(uri))
-      throw std::runtime_error("Failed to open device.");
+  if (!m_device.isValid()) {
+    if (STATUS_OK != m_device.open(uri))
+      throw RuntimeError(__func__, "Failed to open device.");
   }
 }
 
 void NIDevice::listAllSensorModes() {
   printf("IR Sensor:\n");
-  if (device.hasSensor(SENSOR_IR))
-    printSupportedVideoModes(device.getSensorInfo(SENSOR_IR));
+  if (m_device.hasSensor(SENSOR_IR))
+    printSupportedVideoModes(m_device.getSensorInfo(SENSOR_IR));
   else
     printf("Not available.\n\n");
 
   printf("Depth Sensor:\n");
-  if (device.hasSensor(SENSOR_DEPTH))
-    printSupportedVideoModes(device.getSensorInfo(SENSOR_DEPTH));
+  if (m_device.hasSensor(SENSOR_DEPTH))
+    printSupportedVideoModes(m_device.getSensorInfo(SENSOR_DEPTH));
   else
     printf("Not available.\n\n");
 
   printf("RGB Sensor:\n");
-  if (device.hasSensor(SENSOR_COLOR))
-    printSupportedVideoModes(device.getSensorInfo(SENSOR_COLOR));
+  if (m_device.hasSensor(SENSOR_COLOR))
+    printSupportedVideoModes(m_device.getSensorInfo(SENSOR_COLOR));
   else
     printf("Not avaibale.\n\n");
 }
 
 void NIDevice::createStream(const SensorType type, const int mode, bool mirroring) {
-  openni::VideoStream& stream = streams[type-1];
-  const openni::SensorInfo* info = device.getSensorInfo(type);
-  if (!info)
-    throw std::runtime_error("No sensor for the specified type found.");
-
-  if (STATUS_OK != stream.create(device, type))
-    throw std::runtime_error("Failed to create new stream.");
-
-  auto& videomodes = info->getSupportedVideoModes();
-  if (mode < 0 || videomodes.getSize() <= mode)
-    throw std::runtime_error("Invalid video mode was given.");
-
-  if (STATUS_OK != stream.setVideoMode(videomodes[mode]))
-    throw std::runtime_error("Failed to set video mode.");
-
-  if (mirroring != stream.getMirroringEnabled()){
-    if (STATUS_OK != stream.setMirroringEnabled(mirroring))
-      throw std::runtime_error("Failed to set mirroring mode.");
-  }
+  m_streamers[type-1].create(m_device, type, mode, mirroring);
 };
 
 void NIDevice::createDepthStream(const int mode, bool mirroring) {
@@ -132,28 +246,15 @@ void NIDevice::createIRStream(const int mode, bool mirroring) {
 }
 
 uint NIDevice::getResolutionX(SensorType type) const {
-  return streams[type-1].getVideoMode().getResolutionX();
+  return m_streamers[type-1].getWidth();
 }
 
 uint NIDevice::getResolutionY(SensorType type) const {
-  return streams[type-1].getVideoMode().getResolutionY();
+  return m_streamers[type-1].getHeight();
 }
 
 uint NIDevice::getNumChannels(SensorType type) const {
-  PixelFormat format = streams[type-1].getVideoMode().getPixelFormat();
-  switch (format) {
-  case PIXEL_FORMAT_DEPTH_1_MM:
-  case PIXEL_FORMAT_DEPTH_100_UM: 
-  case PIXEL_FORMAT_GRAY8:
-  case PIXEL_FORMAT_GRAY16:
-    return 1;
-  case PIXEL_FORMAT_RGB888:
-  case PIXEL_FORMAT_YUV422:
-    return 3;
-  default:
-    ;
-  }
-  throw std::logic_error("Not implemented for this video mode.");
+  return m_streamers[type-1].getNumChannels();
 }
 
 uint NIDevice::getDepthResolutionX() const {
@@ -185,17 +286,11 @@ uint NIDevice::getIRNumChannels() const {
 }
 
 int NIDevice::getMinValue(SensorType type) const {
-  auto& stream = streams[type-1];
-  if (!stream.isValid())
-    throw std::runtime_error("Video stream is not initialized.");
-  return stream.getMinPixelValue();
+  return m_streamers[type-1].getMinValue();
 }
 
 int NIDevice::getMaxValue(SensorType type) const {
-  auto& stream = streams[type-1];
-  if (!stream.isValid())
-    throw std::runtime_error("Video stream is not initialized.");
-  return stream.getMaxPixelValue();
+  return m_streamers[type-1].getMaxValue();
 }
 
 int NIDevice::getDepthMinValue() const {
@@ -224,128 +319,58 @@ int NIDevice::getIRMaxValue() const {
 
 void NIDevice::setImageRegistration(const bool enable) {
   if (enable) {
-    if (device.isImageRegistrationModeSupported(IMAGE_REGISTRATION_DEPTH_TO_COLOR)) {
-      if (STATUS_OK != device.setImageRegistrationMode(IMAGE_REGISTRATION_DEPTH_TO_COLOR))
-	throw std::runtime_error("Failed to enable depth to color registration.");
+    if (m_device.isImageRegistrationModeSupported(IMAGE_REGISTRATION_DEPTH_TO_COLOR)) {
+      if (STATUS_OK != m_device.setImageRegistrationMode(IMAGE_REGISTRATION_DEPTH_TO_COLOR))
+	throw RuntimeError(__func__, "Failed to enable depth to color registration.");
     } else {
-      throw std::runtime_error("The device does not support depth to color registration.");
+      throw RuntimeError(__func__, "The device does not support depth to color registration.");
     }
   } else {
-    if (STATUS_OK != device.setImageRegistrationMode(IMAGE_REGISTRATION_OFF))
-	throw std::runtime_error("Failed to disable registration mode.");
+    if (STATUS_OK != m_device.setImageRegistrationMode(IMAGE_REGISTRATION_OFF))
+	throw RuntimeError(__func__, "Failed to disable registration mode.");
   }
 }
 
 void NIDevice::setDepthColorSync(const bool enable) {
-  if (STATUS_OK != device.setDepthColorSyncEnabled(enable))
-    throw std::runtime_error("Failed to set depth/color sync mode.");
+  if (STATUS_OK != m_device.setDepthColorSyncEnabled(enable))
+    throw RuntimeError(__func__, "Failed to set depth/color sync mode.");
 }
 
 void NIDevice::startStream(SensorType type) {
-  auto& stream = streams[type-1];
-  if (stream.isValid()) {
-    if (STATUS_OK != stream.start())
-      throw std::runtime_error("Failed to start stream.");
-  }
+  m_streamers[type-1].start();
 }
 
 void NIDevice::startAllStreams() {
-  SensorType types[] = {SENSOR_IR, SENSOR_DEPTH, SENSOR_COLOR};
-  for (auto& type : types) 
-    startStream(type);
-}
-
-void NIDevice::stopStream(SensorType type) {
-  if (streams[type-1].isValid())
-    streams[type-1].stop();
-}
-
-void NIDevice::stopAllStreams() {
-  SensorType types[] = {SENSOR_IR, SENSOR_DEPTH, SENSOR_COLOR};
-  for (auto& type : types) 
-    stopStream(type);
-}
-
-void NIDevice::getFrame(openni::SensorType type) {
-  int dummy = 0;
-  VideoStream* pStream = &streams[type-1];
-  if (!(pStream->isValid()))
-    throw std::runtime_error("Stream not initialized.");
-  releaseFrame(type);
-  if (STATUS_OK != OpenNI::waitForAnyStream(&pStream, 1, &dummy, WAIT_TIMEOUT))
-    throw std::runtime_error("Stream timeout.");
-  if (STATUS_OK != streams[type-1].readFrame(&frames[type-1]))
-    throw std::runtime_error("Failed to read frame.");
-}
-
-void NIDevice::getAllFrames() {
-  SensorType types[] = {SENSOR_IR, SENSOR_DEPTH, SENSOR_COLOR};
   for (int i=0; i<3; ++i) {
-    if (streams[i].isValid())
-      getFrame(types[i]);
+    if (m_streamers[i].isValid())
+      m_streamers[i].start();
   }
 }
 
-void NIDevice::releaseFrame(openni::SensorType type) {
-  auto& frame = frames[type-1];
-  if (frame.isValid())
-    frame.release();
+void NIDevice::stopStream(SensorType type) {
+  m_streamers[type-1].stop();
 }
 
-void NIDevice::releaseAllFrames() {
-  SensorType types[] = {SENSOR_IR, SENSOR_DEPTH, SENSOR_COLOR};
-  for (auto& type : types)
-    releaseFrame(type);
+void NIDevice::stopAllStreams() {
+  for (int i=0; i<3; ++i) {
+    if (m_streamers[i].isValid())
+      m_streamers[i].stop();
+  }
 }
 
 void NIDevice::copyFrame(SensorType type,
-			 void* pDst, int offset, int padding) const {
-  auto& frame = frames[type-1];
-  uint width = frame.getWidth();
-  uint height = frame.getHeight();
-  uint BPP = frame.getStrideInBytes() / width;
-  const void *pSrc = static_cast<const void *>(frame.getData());
-  ::copyFrame(pSrc, pDst, width, height, BPP, offset, padding);
+			 void* pDst, int offset, int padding) {
+  m_streamers[type-1].copyTo(pDst, offset, padding);
 }
 
-void NIDevice::copyDepthFrame(void* pDst, int offset, int padding) const {
+void NIDevice::copyDepthFrame(void* pDst, int offset, int padding) {
   copyFrame(SENSOR_DEPTH, pDst, offset, padding);
 }
 
-void NIDevice::copyColorFrame(void* pDst, int offset, int padding) const {
+void NIDevice::copyColorFrame(void* pDst, int offset, int padding) {
   copyFrame(SENSOR_COLOR, pDst, offset, padding);
 }
 
-void NIDevice::copyIRFrame(void* pDst, int offset, int padding) const {
+void NIDevice::copyIRFrame(void* pDst, int offset, int padding) {
   copyFrame(SENSOR_IR, pDst, offset, padding);
-}
-
-void NIDevice::convert16BitFrameTo8Bit(SensorType type,
-				       uint8_t* pDst,
-				       const uint color_format,
-				       const uint16_t v_min,
-				       const uint16_t v_max) {
-  auto& frame = frames[type-1];
-  uint width = frame.getWidth();
-  uint height = frame.getHeight();
-  uint BPP = frame.getStrideInBytes() / width;
-  const uint16_t *pSrc = static_cast<const uint16_t *>(frame.getData());
-  convert16BitFrameToJet(pSrc, pDst, width, height, color_format, v_min, v_max);
-}
-
-void NIDevice::convertDepthFrameToJet(uint8_t* pDst,
-				      const uint color_format,
-				      const uint16_t v_min,
-				      const uint16_t v_max){
-  // Modification for PIXEL_FORMAT_DEPTH_100_UM
-  auto format = streams[SENSOR_DEPTH-1].getVideoMode().getPixelFormat();
-  uint16_t c = (PIXEL_FORMAT_DEPTH_100_UM == format)? 100:1;
-  convert16BitFrameTo8Bit(SENSOR_DEPTH, pDst, color_format, v_min*c, v_max*c);
-}
-
-void NIDevice::convertIRFrameToJet(uint8_t* pDst,
-				    const uint color_format,
-				    const uint16_t v_min,
-				    const uint16_t v_max){
-  convert16BitFrameTo8Bit(SENSOR_IR, pDst, color_format, v_min, v_max);
 }

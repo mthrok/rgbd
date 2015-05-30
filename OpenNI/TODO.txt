@@ -7,3 +7,9 @@ Add FPS to window
 Make RGBDFrame more flexible
 
 Add multithreading to NIDevice
+
+Clean up NIDevice API
+
+Modify recorder to incorperate new NIDevice API
+
+Add initial wait to NIDevice

@@ -62,26 +62,26 @@ void record(uint nFrames, int depthMode, int colorMode, int IRMode=-1) {
   // Main loop
   while (1) {
     try {
-      nid.getAllFrames();
+      //nid.getAllFrames();
       if (-1 < IRMode) {
 	if (3 == cIR) {
 	  nid.copyIRFrame(visualizer.getColorBuffer(), 1, 1);
 	  nid.copyIRFrame(rgbdf.getColorFrame());
 	} else {
-	  nid.convertIRFrameToJet(visualizer.getColorBuffer());
-	  nid.copyIRFrame(rgbdf.getDepthFrame());
+	  //nid.convertIRFrameToJet(visualizer.getColorBuffer());
+	  //nid.copyIRFrame(rgbdf.getDepthFrame());
 	}
       } else {
 	if (-1 < colorMode) {
 	  nid.copyColorFrame(visualizer.getColorBuffer(), 1, 1);
 	  nid.copyColorFrame(rgbdf.getColorFrame());
 	} if (-1 < depthMode) {
-	  nid.convertDepthFrameToJet(visualizer.getDepthBuffer());
-	  nid.copyDepthFrame(rgbdf.getDepthFrame());
+	  //nid.convertDepthFrameToJet(visualizer.getDepthBuffer());
+	  //nid.copyDepthFrame(rgbdf.getDepthFrame());
 	}
       }
       rgbdf.incrementFrameIndex();
-      nid.releaseAllFrames();
+      //nid.releaseAllFrames();
     } catch(const std::runtime_error& e) {
       printf("%s/n", e.what());
     }

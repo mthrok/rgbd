@@ -43,10 +43,10 @@ void convert16BitFrameToJet(const uint16_t* pSrc, uint8_t* pDst,
 //! @param width   Width of frame in pixel
 //! @param height  Height of frame in pixel
 //! @param BPP     Byte Par Pixel. (Size of one pixel in byte.)
-//! @param offset  Destination buffer offset in byte. This size from the head
-//!   of destination buffer is skipped.
-//! @param padding Destination buffer padding. At the end of each pixel, this
-//!   size of buffer is skipped.
+//! @param offset  Offset in byte. This size from the head of destination buffer
+//!   is skipped.
+//! @param padding Padding in byte. At the end of each pixel, this size of
+//!   buffer is skipped.
 //!
 void copyFrame(const void* pSrc, void* pDst,
 	       const uint width, const uint height,
