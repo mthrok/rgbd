@@ -50,20 +50,36 @@ void printSupportedVideoModes(const SensorInfo* info) {
   printf("\n");
 }
 
+Listener::Listener()
+  : m_callbackFcn()
+{};
+
+Listener::~Listener() {
+};
+
+void Listener::onNewFrame (VideoStream &stream) {
+  m_callbackFcn();
+};
+
+void Listener::setCallbackFcn(std::function<void()> fcn) {
+  m_callbackFcn = fcn;
+};
+
 Streamer::Streamer()
   : m_stream()
   , m_frame()
+  , m_frameMutex()
   , m_listener()
   , m_bStreaming(false)
 {};
 
 Streamer::~Streamer() {
+  if (m_bStreaming)
+    stop();
   if (m_frame.isValid())
     m_frame.release();
-  if (m_stream.isValid()) {
-    m_stream.stop();
+  if (m_stream.isValid())
     m_stream.destroy();
-  }
 }
 
 void Streamer::create(Device &device, const SensorType type,
@@ -121,9 +137,11 @@ void Streamer::stop() {
   if (!m_stream.isValid())
     throw RuntimeError({__func__, ":", "Stream is not initialized."});
 
-  m_stream.stop();
-
-  m_bStreaming = false;
+  if (m_bStreaming) {
+    m_stream.stop();
+    m_stream.removeNewFrameListener(&m_listener);
+    m_bStreaming = false;
+  }
 }
 
 bool Streamer::isStreamValid() const {
@@ -187,21 +205,6 @@ void Streamer::copyTo(void* pDst, const uint offset, const uint padding) {
   ::copyFrame(pSrc, pDst, width, height, BPP, offset, padding);
 }
 
-Listener::Listener()
-  : m_callbackFcn()
-{};
-
-Listener::~Listener() {
-};
-
-void Listener::onNewFrame (VideoStream &stream) {
-  m_callbackFcn();
-};
-
-void Listener::setCallbackFcn(std::function<void()> fcn) {
-  m_callbackFcn = fcn;
-};
-
 void NIDevice::initONI() {
   Status rc = OpenNI::initialize();
   if (rc != STATUS_OK)
@@ -218,6 +221,7 @@ NIDevice::NIDevice()
 {}
 
 NIDevice::~NIDevice() {
+  stopStreams();
   if (m_device.isValid())
     m_device.close();
 }
@@ -342,15 +346,15 @@ void NIDevice::setImageRegistration(const bool enable) {
   if (enable) {
     if (m_device.isImageRegistrationModeSupported(IMAGE_REGISTRATION_DEPTH_TO_COLOR)) {
       if (STATUS_OK != m_device.setImageRegistrationMode(IMAGE_REGISTRATION_DEPTH_TO_COLOR))
-	throw RuntimeError({__func__,
+	throw RuntimeError({__func__, ":",
 	      "Failed to enable depth to color registration."});
     } else {
-      throw RuntimeError({__func__,
+      throw RuntimeError({__func__, ":",
 	    "The device does not support depth to color registration."});
     }
   } else {
     if (STATUS_OK != m_device.setImageRegistrationMode(IMAGE_REGISTRATION_OFF))
-      throw RuntimeError({__func__,
+      throw RuntimeError({__func__, ":",
 	    "Failed to disable registration mode."});
   }
 }

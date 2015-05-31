@@ -40,12 +40,12 @@ public:
   bool isStreaming() const;
   bool isFrameValid() const;
 
-  void copyTo(void* pDst, const uint offset=0, const uint padding=0);
   uint getWidth() const;
   uint getHeight() const;
   uint getNumChannels() const;
   uint getMinValue() const;
   uint getMaxValue() const;
+  void copyTo(void* pDst, const uint offset=0, const uint padding=0);
 };
 
 class NIDevice {

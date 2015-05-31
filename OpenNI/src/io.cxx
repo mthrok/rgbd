@@ -83,13 +83,15 @@ Frames::~Frames() {
 }
 
 void Frames::deallocate() {
-  delete[] static_cast<uint8_t *>(m_pBuffer);
-  m_pBuffer = NULL;
+  if (m_pBuffer) {
+    delete[] static_cast<uint8_t *>(m_pBuffer);
+    m_pBuffer = NULL;
+  }
 }
 
 void Frames::allocate(uint width, uint height, uint BPP, uint nFrames) {
   if (nFrames == 0)
-    throw std::runtime_error("#Frames cannnot be 0.");
+    throw RuntimeError({__func__, "#Frames cannnot be 0."});
   m_width = width; m_height = height; m_BPP = BPP; m_nFrames = nFrames;
   deallocate();
   size_t buffersize = size_t(m_nFrames) * m_width * m_height * m_BPP;

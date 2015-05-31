@@ -12,71 +12,83 @@ void listModes() {
   nid.listAllSensorModes();
 }
 
-void view(int depthMode, int colorMode, int IRMode=-1) {
-  // Initialize device and get frame sizes
-  uint w16B = 0, h16B = 0, w8B = 0, h8B = 0, cIR=1;
-  uint16_t minDepth = 0, maxDepth = 0;
+void viewIR(int IRMode) {
   NIDevice nid;
-  RGBDVisualizer visualizer;
   Frames frame;
+  RGBDVisualizer visualizer;
   nid.openDevice();
-  if (-1 < IRMode) {
-    nid.createIRStream(IRMode);
-    cIR = nid.getIRNumChannels();
-    w8B = nid.getIRWidth();
-    h8B = nid.getIRHeight();
-    visualizer.initWindow(0, 0, w8B, h8B);
-    if (1==cIR)
-      frame.allocate(w8B, h8B, 2, 1);
-  } else {
-    if (-1 < depthMode) {
-      nid.createDepthStream(depthMode);
-      w16B = nid.getDepthWidth();
-      h16B = nid.getDepthHeight();
-      minDepth = nid.getDepthMinValue();
-      maxDepth = nid.getDepthMaxValue();
-      frame.allocate(w16B, h16B, 2, 1);
-    }
-    if (-1 < colorMode) {
-      nid.createColorStream(colorMode);
-      w8B = nid.getColorWidth();
-      h8B = nid.getColorHeight();
-    }
-    if (-1 < depthMode && -1 < colorMode) {
-      nid.setImageRegistration();
-      nid.setDepthColorSync();
-    }
-    visualizer.initWindow(w16B, h16B, w8B, h8B);
-  }
-
+  nid.createIRStream(IRMode);
+  uint wIR = nid.getIRWidth();
+  uint hIR = nid.getIRHeight();
+  uint cIR = nid.getIRNumChannels();
   nid.startStreams();
   nid.waitStreamsToGetReady();
+  frame.allocate(wIR, hIR, 2, 1);
+  visualizer.initWindow(wIR, hIR, 0, 0);
   while (1) {
     try {
-      if (-1 < IRMode) {
-	if (3 == cIR) {
-	  nid.copyIRFrame(visualizer.getColorBuffer(), 1, 1);
-	} else {
-	  nid.copyIRFrame(frame.getFrame(), 0, 0);
-	  frame.convert16BitFrameToJet(visualizer.getColorBuffer(), -1, 0, 1000); // Check
-	}
-      } else {
-	if (-1 < colorMode) 
-	  nid.copyColorFrame(visualizer.getColorBuffer(), 1, 1);
-	if (-1 < depthMode) {
-	  nid.copyDepthFrame(frame.getFrame(), 0, 0);
-	  frame.convert16BitFrameToJet(visualizer.getDepthBuffer(), -1, minDepth, maxDepth); // Check
-	}
-      }
-    } catch(const std::runtime_error& e) {
+      nid.copyIRFrame(frame.getFrame());
+      if (3 == cIR)
+	frame.copyFrameTo(visualizer.getDepthBuffer(), 1, 1);
+      else
+	frame.convert16BitFrameToJet(visualizer.getDepthBuffer(), -1, 0, 1024); // Check
+    } catch(const std::exception& e) {
       printf("%s\n", e.what());
     }
     visualizer.refreshWindow();
     if (visualizer.isStopped())
       break;
   }
+  frame.deallocate();
   nid.stopStreams();
 }
+
+void viewRGBD(int depthMode, int colorMode) {
+  NIDevice nid;
+  Frames frame;
+  RGBDVisualizer visualizer;
+  uint wDepth = 0, hDepth = 0, wColor = 0, hColor = 0;
+  uint16_t minDepth = DEFAULT_DEPTH_MIN, maxDepth = DEFAULT_DEPTH_MAX;
+  nid.openDevice();
+ if (-1 < depthMode) {
+    nid.createDepthStream(depthMode);
+    wDepth = nid.getDepthWidth();
+    hDepth = nid.getDepthHeight();
+    minDepth = nid.getDepthMinValue();
+    maxDepth = nid.getDepthMaxValue();
+    frame.allocate(wDepth, hDepth, 2, 1);
+  }
+  if (-1 < colorMode) {
+    nid.createColorStream(colorMode);
+    wColor = nid.getColorWidth();
+    hColor = nid.getColorHeight();
+  }
+  if (-1 < depthMode && -1 < colorMode) {
+    nid.setImageRegistration();
+    nid.setDepthColorSync();
+  }
+  nid.startStreams();
+  nid.waitStreamsToGetReady();
+  visualizer.initWindow(wDepth, hDepth, wColor, hColor);
+  while (1) {
+    try {
+      if (-1 < colorMode)
+	nid.copyColorFrame(visualizer.getColorBuffer(), 1, 1);
+      if (-1 < depthMode) {
+	nid.copyDepthFrame(frame.getFrame(), 0, 0);
+	frame.convert16BitFrameToJet(visualizer.getDepthBuffer(), -1, minDepth, maxDepth);
+      }
+    } catch(const std::exception& e) {
+      printf("%s\n", e.what());
+    }
+    visualizer.refreshWindow();
+    if (visualizer.isStopped())
+      break;
+  }
+  frame.deallocate();
+  nid.stopStreams();
+}
+
 
 struct Option {
   bool printHelp = false;
@@ -109,18 +121,23 @@ Option parseArguments(int argc, char *argv[]) {
       i += 1;
       if (i == argc) goto fail2;
       val = argv[i];
-      opt.IRMode = std::stoi(val);
-      opt.depthMode = opt.colorMode = -1;
+      int mode = std::stoi(val);
+      if (0 <= mode) {
+	opt.IRMode = mode;
+	opt.depthMode = opt.colorMode = -1;
+      }
     } else if (arg == "--depth-mode") {
       i += 1;
       if (i == argc) goto fail2;
       val = argv[i];
       opt.depthMode = std::stoi(val);
+      opt.IRMode = -1;
     } else if (arg == "--color-mode") {
       i += 1;
       if (i == argc) goto fail2;
       val = argv[i];
       opt.colorMode = std::stoi(val);
+      opt.IRMode = -1;
     } else {
       goto fail1;
     }
@@ -150,10 +167,14 @@ int main(int argc, char *argv[]) {
   NIDevice::initONI();
   RGBDVisualizer::initSDL();
   try{
-    if (opt.listModes)
+    if (opt.listModes) {
       listModes();
-    else
-      view(opt.depthMode, opt.colorMode, opt.IRMode);
+    } else {
+      if (opt.IRMode >= 0)
+	viewIR(opt.IRMode);
+      else
+	viewRGBD(opt.depthMode, opt.colorMode);
+    }
   } catch (const std::exception& e) {
     printf("%s\n", e.what());
     ret = -1;
