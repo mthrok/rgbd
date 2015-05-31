@@ -27,26 +27,26 @@ void record(uint nFrames, int depthMode, int colorMode, int IRMode=-1) {
     nid.createIRStream(IRMode);
     cIR = nid.getIRNumChannels();
     if (3 == cIR) {
-      w8B = nid.getIRResolutionX();
-      h8B = nid.getIRResolutionY();
+      w8B = nid.getIRWidth();
+      h8B = nid.getIRHeight();
       rgbdf.allocate(0, 0, w8B, h8B, nFrames);
       visualizer.initWindow(0, 0, w8B, h8B);
     } else {
-      w16B = nid.getIRResolutionX();
-      h16B = nid.getIRResolutionY();
+      w16B = nid.getIRWidth();
+      h16B = nid.getIRHeight();
       rgbdf.allocate(w16B, h16B, 0, 0, nFrames);
       visualizer.initWindow(0, 0, w16B, h16B);
     }
   } else {
     if (-1 < depthMode) {
       nid.createDepthStream(depthMode);
-      w16B = nid.getDepthResolutionX();
-      h16B = nid.getDepthResolutionY();
+      w16B = nid.getDepthWidth();
+      h16B = nid.getDepthHeight();
     }
     if (-1 < colorMode) {
       nid.createColorStream(colorMode);
-      w8B = nid.getColorResolutionX();
-      h8B = nid.getColorResolutionY();
+      w8B = nid.getColorWidth();
+      h8B = nid.getColorHeight();
     }
     if (-1 < depthMode && -1 < colorMode) {
       nid.setImageRegistration();
@@ -57,7 +57,7 @@ void record(uint nFrames, int depthMode, int colorMode, int IRMode=-1) {
   }
 
   // Start streams
-  nid.startAllStreams();
+  nid.startStreams();
 
   // Main loop
   while (1) {

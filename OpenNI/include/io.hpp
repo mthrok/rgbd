@@ -1,10 +1,19 @@
 #ifndef __OPENNI_INCLUDE_IO_HPP__
 #define __OPENNI_INCLUDE_IO_HPP__
 
-#include "types.hpp"
+#include <stdexcept>
+#include <string>
 
 #include <cstdint>
 #include <cstdlib>
+#include "types.hpp"
+
+class RuntimeError : public std::exception {
+  std::string m_message;
+public:
+  RuntimeError(std::initializer_list<std::string> msgs);
+  virtual const char* what() const throw();
+};
 
 //!
 //! Given one value return its jet color mapping in RGB.
@@ -34,7 +43,6 @@ void convert16BitFrameToJet(const uint16_t* pSrc, uint8_t* pDst,
 			    const uint format=1,
 			    const uint16_t v_min = DEFAULT_DEPTH_MIN,
 			    const uint16_t v_max = DEFAULT_DEPTH_MAX);
-
 
 //!
 //! Copy one frame data from source to destination buffer (both preallocated).
@@ -72,6 +80,9 @@ public:
 
   void* getFrame(int iFrame=-1);
   void copyFrameTo(void* pDst, int iFrame=-1, int offset=0, int padding=0);
+  void convert16BitFrameToJet(uint8_t* pDst, int iFrame,
+			      const uint16_t v_min, const uint16_t v_max,
+			      const uint format=1);
 };
 
 class RGBDFrames {
@@ -79,7 +90,7 @@ class RGBDFrames {
 public:
   RGBDFrames();
   ~RGBDFrames();
-  
+
   void deallocate();
   void allocate(uint depthW, uint depthH, uint colorW, uint colorH, uint nFrames);
 
@@ -90,7 +101,7 @@ public:
   
   uint8_t* getColorFrame(int iFrame=-1);
   uint16_t* getDepthFrame(int iFrame=-1);
-  
+
   void copyDepthFrameTo(uint16_t* pDst, int iFrame=-1, uint offset=0, uint padding=0);
   void copyColorFrameTo(uint8_t* pDst, int iFrame=-1, uint offset=0, uint padding=0);
   void convert16BitFrameToJet(uint8_t* pDst, int iFrame,

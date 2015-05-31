@@ -1,9 +1,6 @@
+#include "io.hpp"
 #include "NIDevice.hpp"
 #include "RGBDVisualizer.hpp"
-
-#include <thread>
-#include <string>
-#include <stdexcept>
 
 #define DEFAULT_DEPTH_MODE 0
 #define DEFAULT_COLOR_MODE 0
@@ -21,25 +18,29 @@ void view(int depthMode, int colorMode, int IRMode=-1) {
   uint16_t minDepth = 0, maxDepth = 0;
   NIDevice nid;
   RGBDVisualizer visualizer;
+  Frames frame;
   nid.openDevice();
   if (-1 < IRMode) {
     nid.createIRStream(IRMode);
     cIR = nid.getIRNumChannels();
-    w8B = nid.getIRResolutionX();
-    h8B = nid.getIRResolutionY();
+    w8B = nid.getIRWidth();
+    h8B = nid.getIRHeight();
     visualizer.initWindow(0, 0, w8B, h8B);
+    if (1==cIR)
+      frame.allocate(w8B, h8B, 2, 1);
   } else {
     if (-1 < depthMode) {
       nid.createDepthStream(depthMode);
-      w16B = nid.getDepthResolutionX();
-      h16B = nid.getDepthResolutionY();
+      w16B = nid.getDepthWidth();
+      h16B = nid.getDepthHeight();
       minDepth = nid.getDepthMinValue();
       maxDepth = nid.getDepthMaxValue();
+      frame.allocate(w16B, h16B, 2, 1);
     }
     if (-1 < colorMode) {
       nid.createColorStream(colorMode);
-      w8B = nid.getColorResolutionX();
-      h8B = nid.getColorResolutionY();
+      w8B = nid.getColorWidth();
+      h8B = nid.getColorHeight();
     }
     if (-1 < depthMode && -1 < colorMode) {
       nid.setImageRegistration();
@@ -48,21 +49,24 @@ void view(int depthMode, int colorMode, int IRMode=-1) {
     visualizer.initWindow(w16B, h16B, w8B, h8B);
   }
 
-  nid.startAllStreams();
-  // TODO INcoorperate atomic flag??
-  std::this_thread::sleep_for(std::chrono::milliseconds(500));
+  nid.startStreams();
+  nid.waitStreamsToGetReady();
   while (1) {
     try {
       if (-1 < IRMode) {
-	if (3 == cIR)
+	if (3 == cIR) {
 	  nid.copyIRFrame(visualizer.getColorBuffer(), 1, 1);
-	else
-	  nid.copyIRFrame(visualizer.getColorBuffer(), 1, 2);
+	} else {
+	  nid.copyIRFrame(frame.getFrame(), 0, 0);
+	  frame.convert16BitFrameToJet(visualizer.getColorBuffer(), -1, 0, 1000); // Check
+	}
       } else {
-	if (-1 < colorMode)
+	if (-1 < colorMode) 
 	  nid.copyColorFrame(visualizer.getColorBuffer(), 1, 1);
-	if (-1 < depthMode)
-	  nid.copyDepthFrame(visualizer.getDepthBuffer(), 1, 2);
+	if (-1 < depthMode) {
+	  nid.copyDepthFrame(frame.getFrame(), 0, 0);
+	  frame.convert16BitFrameToJet(visualizer.getDepthBuffer(), -1, minDepth, maxDepth); // Check
+	}
       }
     } catch(const std::runtime_error& e) {
       printf("%s\n", e.what());
@@ -71,7 +75,7 @@ void view(int depthMode, int colorMode, int IRMode=-1) {
     if (visualizer.isStopped())
       break;
   }
-  nid.stopAllStreams();
+  nid.stopStreams();
 }
 
 struct Option {
@@ -92,8 +96,9 @@ void printHelp() {
 
 Option parseArguments(int argc, char *argv[]) {
   Option opt;
+  std::string arg, val;
   for (int i=1; i<argc; ++i) {
-    std::string arg(argv[i]);
+    arg = (argv[i]);
     if (arg == "--help") {
       opt.printHelp = true;
       break;
@@ -103,18 +108,18 @@ Option parseArguments(int argc, char *argv[]) {
     } else if (arg == "--ir-mode") {
       i += 1;
       if (i == argc) goto fail2;
-      std::string val(argv[i]);
+      val = argv[i];
       opt.IRMode = std::stoi(val);
       opt.depthMode = opt.colorMode = -1;
     } else if (arg == "--depth-mode") {
       i += 1;
       if (i == argc) goto fail2;
-      std::string val(argv[i]);
+      val = argv[i];
       opt.depthMode = std::stoi(val);
     } else if (arg == "--color-mode") {
       i += 1;
       if (i == argc) goto fail2;
-      std::string val(argv[i]);
+      val = argv[i];
       opt.colorMode = std::stoi(val);
     } else {
       goto fail1;
@@ -122,9 +127,9 @@ Option parseArguments(int argc, char *argv[]) {
   }
   return opt;
  fail1:
-  throw std::runtime_error("Unexpected option was given.");
+  throw RuntimeError({"Unexpected option ", arg, " was given."});
  fail2:
-  throw std::runtime_error("Parameter not given.");
+  throw RuntimeError({"Parameter for ", arg, " is missing."});
 }
 
 int main(int argc, char *argv[]) {

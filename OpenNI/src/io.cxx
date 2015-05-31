@@ -2,9 +2,14 @@
 #include <cmath>
 #include <stdexcept>
 
-//double interpolate(double val, double x0, double x1, double y0, double y1) {
-//  return (val-x0) * (y1-y0) / (x1-x0) + y0;
-//}
+RuntimeError::RuntimeError (std::initializer_list<std::string> msgs) {
+  for(auto &msg : msgs)
+    m_message += msg;
+}
+
+const char* RuntimeError::what() const throw () {
+  return m_message.c_str();
+}
 
 void jet(const uint16_t val, uint8_t& R, uint8_t& G, uint8_t& B,
 	 const uint16_t v_min, const uint16_t v_max) {
@@ -16,32 +21,6 @@ void jet(const uint16_t val, uint8_t& R, uint8_t& G, uint8_t& B,
     return;
   }
   double r = ((double)val - v_min) / (v_max - v_min);
-  // MATLAB Jet style
-  // http://stackoverflow.com/questions/7706339/grayscale-to-red-green-blue-matlab-jet-color-scale
-  /*
-  if (r < 0.125) {
-    R = 0;
-    G = 0;
-    B = (uint8_t) (255 * interpolate(r, 0.000, 0.125, 0.5, 1.0));
-  } else if (r < 0.375) {
-    R = 0;
-    G = (uint8_t) (255 * interpolate(r, 0.125, 0.375, 0.0, 1.0));
-    B = 255;
-  } else if (r < 0.625) {
-    R = (uint8_t) (255 * interpolate(r, 0.375, 0.625, 0.0, 1.0));
-    G = 255;
-    B = (uint8_t) (255 * interpolate(r, 0.375, 0.625, 1.0, 0.0));
-  } else if (r < 0.875) {
-    R = 255;
-    G = (uint8_t) (255 * interpolate(r, 0.625, 0.875, 1.0, 0.0));
-    B = 0;
-  } else {
-    R = (uint8_t) (255 * interpolate(r, 0.875, 1.000, 1.0, 0.5));
-    G = 0;
-    B = 0;
-  }
-  */
-  // Smoother version
   double t = 2.0 * M_PI * r;
   R = (uint8_t) (255 * (-sin(t) + 1.0) / 2.0);
   B = (uint8_t) (255 * ( sin(t) + 1.0) / 2.0);
@@ -62,7 +41,8 @@ void convert16BitFrameToJet(const uint16_t* pSrc, uint8_t* pDst,
     channel = 4;
     break;
   default:
-    break;
+    throw RuntimeError({__func__, ":",
+	  "Not implemented for format ", std::to_string(mode)});
   }
   for (uint h=0; h<height; ++h) {
     for (uint w=0; w<width; ++w) {
@@ -145,7 +125,14 @@ void* Frames::getFrame(int iFrame){
 
 void Frames::copyFrameTo(void* pDst, int iFrame, int offset, int padding) {
   const void *pSrc = static_cast<const void *>(getFrame(iFrame));
-  copyFrame(pSrc, pDst, m_width, m_height, m_BPP, offset, padding);
+  ::copyFrame(pSrc, pDst, m_width, m_height, m_BPP, offset, padding);
+}
+
+void Frames::convert16BitFrameToJet(uint8_t* pDst, int iFrame,
+				    const uint16_t v_min, const uint16_t v_max,
+				    const uint format) {
+  const uint16_t *pSrc = static_cast<const uint16_t *>(getFrame(iFrame));
+  ::convert16BitFrameToJet(pSrc, pDst, m_width, m_height, format, v_min, v_max);
 }
 
 RGBDFrames::RGBDFrames()
