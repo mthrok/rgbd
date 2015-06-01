@@ -7,7 +7,7 @@
 #define MAX_WINDOW_TITLE_LENGTH 64
 
 class EventHandler {
-  
+
 };
 
 class RGBDVisualizer {
@@ -38,7 +38,7 @@ public:
 
   void initWindow(uint depthW, uint depthH, uint colorW, uint colorH);
   void refreshWindow();
-  
+
   uint8_t* getColorBuffer() const;
   uint8_t* getDepthBuffer() const;
 

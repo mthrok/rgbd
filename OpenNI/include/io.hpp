@@ -3,15 +3,28 @@
 
 #include <stdexcept>
 #include <string>
+#include <chrono>
 
 #include <cstdint>
 #include <cstdlib>
+
 #include "types.hpp"
 
 class RuntimeError : public std::exception {
   std::string m_message;
+
+  void concat(std::string message);
+  void concat(const char* message);
+  template <typename T> void concat(T arg) {
+    m_message += std::to_string(arg);
+  };
+  template <typename T, typename... Args> void concat(T arg, Args... args) {
+    concat(arg); concat(args...);
+  };
 public:
-  RuntimeError(std::initializer_list<std::string> msgs);
+  template <typename... Args> RuntimeError(Args... args) {
+    concat(args...);
+  };
   virtual const char* what() const throw();
 };
 
@@ -25,7 +38,7 @@ public:
 //! @param v_max Upper bound of input value range
 //! @note Values smaller than v_min are mapped to black, and
 //!   values bigger than v_max is mapped to white.
-//! 
+//!
 void jet(const uint16_t val, uint8_t& R, uint8_t& G, uint8_t& B,
 	 const uint16_t v_min = DEFAULT_DEPTH_MIN,
 	 const uint16_t v_max = DEFAULT_DEPTH_MAX);
@@ -60,8 +73,10 @@ void copyFrame(const void* pSrc, void* pDst,
 	       const uint width, const uint height,
 	       const uint BPP, const int offset=0, const int padding=0);
 
+std::chrono::microseconds getCurrentTimestamp();
+
 class Frames {
-  uint m_width, m_height, m_BPP, m_nFrames, m_currentFrame; 
+  uint m_width, m_height, m_BPP, m_nFrames, m_currentFrame;
   void *m_pBuffer;
 
 public:
@@ -83,6 +98,10 @@ public:
   void convert16BitFrameToJet(uint8_t* pDst, int iFrame,
 			      const uint16_t v_min, const uint16_t v_max,
 			      const uint format=1);
+  void copyCurrentFrameTo(void* pDst, int offset=0, int padding=0);
+  void convertCurrent16BitFrameToJet(uint8_t* pDst,
+				     const uint16_t v_min, const uint16_t v_max,
+				     const uint format=1);
 };
 
 class RGBDFrames {
@@ -98,7 +117,7 @@ public:
   void incrementFrameIndex();
   uint getFrameIndex();
   void setFrameIndex(int iFrame);
-  
+
   uint8_t* getColorFrame(int iFrame=-1);
   uint16_t* getDepthFrame(int iFrame=-1);
 

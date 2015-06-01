@@ -28,6 +28,7 @@ class Streamer {
   std::mutex            m_frameMutex;
   Listener              m_listener;
   bool                  m_bStreaming;
+  std::atomic<std::chrono::microseconds> m_time;
 public:
   Streamer();
   ~Streamer();

@@ -54,8 +54,7 @@ Listener::Listener()
   : m_callbackFcn()
 {};
 
-Listener::~Listener() {
-};
+Listener::~Listener() {};
 
 void Listener::onNewFrame (VideoStream &stream) {
   m_callbackFcn();
@@ -71,6 +70,7 @@ Streamer::Streamer()
   , m_frameMutex()
   , m_listener()
   , m_bStreaming(false)
+  , m_time()
 {};
 
 Streamer::~Streamer() {
@@ -83,60 +83,58 @@ Streamer::~Streamer() {
 }
 
 void Streamer::create(Device &device, const SensorType type,
-				const int mode, const bool mirroring) {
+		      const int mode, const bool mirroring) {
   const openni::SensorInfo* info = device.getSensorInfo(type);
   if (!info)
-    throw RuntimeError({__func__, ":",
-	  "No sensor for ", getSensorTypeString(type), " found."});
-
-  if (STATUS_OK != m_stream.create(device, type))
-    throw RuntimeError({__func__, ":",
-	  "Failed to create ", getSensorTypeString(type), " stream."});
+    throw RuntimeError(__func__, ": ",
+	  "No sensor for ", getSensorTypeString(type), " found.");
 
   auto& videomodes = info->getSupportedVideoModes();
   int nModes = videomodes.getSize();
   if (mode < 0 || nModes <= mode)
-    throw RuntimeError({__func__, ":", getSensorTypeString(type), ":",
-	  "Invalid video mode ",  std::to_string(mode), " was given. ",
-	  "Value range [0, ", std::to_string(nModes)});
+    throw RuntimeError(__func__, ":", getSensorTypeString(type), ": ",
+		       "Invalid video mode (", mode, "). ",
+		       "Value range [0, ", nModes, ").");
+
+  if (STATUS_OK != m_stream.create(device, type))
+    throw RuntimeError(__func__, ": Failed to create ",
+		       getSensorTypeString(type), " stream.");
 
   if (STATUS_OK != m_stream.setVideoMode(videomodes[mode]))
-    throw RuntimeError({__func__, ":", getSensorTypeString(type), ":",
-	  "Failed to set video mode."});
+    throw RuntimeError(__func__, ":", getSensorTypeString(type), ": ",
+		       "Failed to set video mode (", mode, ").");
 
   if (mirroring != m_stream.getMirroringEnabled()){
     if (STATUS_OK != m_stream.setMirroringEnabled(mirroring))
-      throw RuntimeError({__func__, ":", getSensorTypeString(type), ":",
-	    "Failed to set mirroring mode."});
+      throw RuntimeError(__func__, ":", getSensorTypeString(type), ": Failed ",
+			 "to ", (mirroring)? "en" : "dis", "able mirroring.");
   }
 
-  m_listener.setCallbackFcn([=](){
+  m_listener.setCallbackFcn([&](){
       std::lock_guard<std::mutex> _(m_frameMutex);
       if (m_frame.isValid())
 	m_frame.release();
       if (STATUS_OK != m_stream.readFrame(&m_frame))
-	throw RuntimeError({"Callback", ":", getSensorTypeString(type), ":",
-	      "Failed to read frame."});
+	throw RuntimeError("Callback:", getSensorTypeString(type),
+			   ": Failed to read frame.");
+      m_time.store(getCurrentTimestamp());
     });
   if (STATUS_OK != m_stream.addNewFrameListener(&m_listener))
-    throw RuntimeError({__func__, ":", getSensorTypeString(type), ":",
-	  "Failed to add event listener."});
+    throw RuntimeError(__func__, ":", getSensorTypeString(type),
+		       ": Failed to add event listener.");
 }
 
 void Streamer::start() {
   if (!m_stream.isValid())
-    throw RuntimeError({__func__, ":", "Video stream is not initialized."});
+    throw RuntimeError(__func__, ": Video stream is not initialized.");
 
   if (STATUS_OK != m_stream.start())
-    throw RuntimeError({__func__, ":", "Faild to start stream."});
+    throw RuntimeError(__func__, ": Faild to start stream.");
 
   m_bStreaming = true;
 };
 
 void Streamer::stop() {
-  if (!m_stream.isValid())
-    throw RuntimeError({__func__, ":", "Stream is not initialized."});
-
   if (m_bStreaming) {
     m_stream.stop();
     m_stream.removeNewFrameListener(&m_listener);
@@ -158,13 +156,13 @@ bool Streamer::isFrameValid() const {
 
 uint Streamer::getWidth() const {
   if (!m_stream.isValid())
-    throw RuntimeError({__func__, ":", "Video stream is not initialized."});
+    throw RuntimeError(__func__, ": Video stream is not initialized.");
   return m_stream.getVideoMode().getResolutionX();
 }
 
 uint Streamer::getHeight() const {
   if (!m_stream.isValid())
-    throw RuntimeError({__func__, ":", "Video stream is not initialized."});
+    throw RuntimeError(__func__, ": Video stream is not initialized.");
   return m_stream.getVideoMode().getResolutionY();
 }
 
@@ -180,19 +178,19 @@ uint Streamer::getNumChannels() const {
   case PIXEL_FORMAT_YUV422:
     return 3;
   default:
-    throw RuntimeError({__func__, ":", "Not implemented for this video mode."});
+    throw RuntimeError(__func__, ": Not implemented for this video mode.");
   }
 }
 
 uint Streamer::getMinValue() const {
   if (!m_stream.isValid())
-    throw RuntimeError({__func__, ":", "Video stream is not initialized."});
+    throw RuntimeError(__func__, ": Video stream is not initialized.");
   return m_stream.getMinPixelValue();
 }
 
 uint Streamer::getMaxValue() const {
   if (!m_stream.isValid())
-    throw RuntimeError({__func__, ":", "Video stream is not initialized."});
+    throw RuntimeError(__func__, ": Video stream is not initialized.");
   return m_stream.getMaxPixelValue();
 }
 
@@ -208,7 +206,7 @@ void Streamer::copyTo(void* pDst, const uint offset, const uint padding) {
 void NIDevice::initONI() {
   Status rc = OpenNI::initialize();
   if (rc != STATUS_OK)
-    throw RuntimeError({__func__, ":", "Failed to initialize OpenNI."});
+    throw RuntimeError(__func__, ": Failed to initialize OpenNI.");
 }
 
 void NIDevice::quitONI() {
@@ -229,8 +227,8 @@ NIDevice::~NIDevice() {
 void NIDevice::openDevice(const char* uri) {
   if (!m_device.isValid()) {
     if (STATUS_OK != m_device.open(uri))
-      throw RuntimeError({__func__, ":",
-	    "Failed to open ", (uri)? uri:"ANY_DEVICE", "."});
+      throw RuntimeError(__func__, ": Failed to open ",
+			 (uri)? uri:"ANY_DEVICE", ".");
   }
 }
 
@@ -346,22 +344,21 @@ void NIDevice::setImageRegistration(const bool enable) {
   if (enable) {
     if (m_device.isImageRegistrationModeSupported(IMAGE_REGISTRATION_DEPTH_TO_COLOR)) {
       if (STATUS_OK != m_device.setImageRegistrationMode(IMAGE_REGISTRATION_DEPTH_TO_COLOR))
-	throw RuntimeError({__func__, ":",
-	      "Failed to enable depth to color registration."});
+	throw RuntimeError(__func__,
+			   ": Failed to enable depth to color registration.");
     } else {
-      throw RuntimeError({__func__, ":",
-	    "The device does not support depth to color registration."});
+      throw RuntimeError(__func__, ": The device does not support "
+			 "depth to color registration.");
     }
   } else {
     if (STATUS_OK != m_device.setImageRegistrationMode(IMAGE_REGISTRATION_OFF))
-      throw RuntimeError({__func__, ":",
-	    "Failed to disable registration mode."});
+      throw RuntimeError(__func__, ": Failed to disable registration mode.");
   }
 }
 
 void NIDevice::setDepthColorSync(const bool enable) {
   if (STATUS_OK != m_device.setDepthColorSyncEnabled(enable))
-    throw RuntimeError({__func__, ":", "Failed to set depth/color sync mode."});
+    throw RuntimeError(__func__, ":", "Failed to set depth/color sync mode.");
 }
 
 void NIDevice::startStream(SensorType type) {
@@ -383,7 +380,7 @@ void NIDevice::waitStreamsToGetReady() const {
       isAnyStreamStreaming = true;
   }
   if (!isAnyStreamStreaming)
-    throw RuntimeError({__func__, ":", "No streaming sensor."});
+    throw RuntimeError(__func__, ": No streaming sensor.");
 
   bool allFramesReady = false;
   while (!allFramesReady) {

@@ -2,13 +2,22 @@
 #include <cmath>
 #include <stdexcept>
 
-RuntimeError::RuntimeError (std::initializer_list<std::string> msgs) {
-  for(auto &msg : msgs)
-    m_message += msg;
+using namespace std::chrono;
+
+void RuntimeError::concat(std::string message) {
+  m_message += message;
+}
+
+void RuntimeError::concat(const char* message) {
+  m_message += std::string(message);
 }
 
 const char* RuntimeError::what() const throw () {
   return m_message.c_str();
+}
+
+microseconds getCurrentTimestamp() {
+  return duration_cast<microseconds>(system_clock::now().time_since_epoch());
 }
 
 void jet(const uint16_t val, uint8_t& R, uint8_t& G, uint8_t& B,
@@ -41,8 +50,7 @@ void convert16BitFrameToJet(const uint16_t* pSrc, uint8_t* pDst,
     channel = 4;
     break;
   default:
-    throw RuntimeError({__func__, ":",
-	  "Not implemented for format ", std::to_string(mode)});
+    throw RuntimeError(__func__, ":Not implemented for format ", mode);
   }
   for (uint h=0; h<height; ++h) {
     for (uint w=0; w<width; ++w) {
@@ -90,10 +98,8 @@ void Frames::deallocate() {
 }
 
 void Frames::allocate(uint width, uint height, uint BPP, uint nFrames) {
-  if (nFrames == 0)
-    throw RuntimeError({__func__, "#Frames cannnot be 0."});
-  m_width = width; m_height = height; m_BPP = BPP; m_nFrames = nFrames;
   deallocate();
+  m_width = width; m_height = height; m_BPP = BPP; m_nFrames = nFrames;
   size_t buffersize = size_t(m_nFrames) * m_width * m_height * m_BPP;
   m_pBuffer = static_cast<void *>(new uint8_t[buffersize]);
 }
@@ -120,6 +126,9 @@ void Frames::incrementFrameIndex() {
 void* Frames::getFrame(int iFrame){
   if (iFrame < 0)
     iFrame = m_currentFrame;
+  if (iFrame >= m_nFrames)
+    throw RuntimeError(__func__, ":Invalid frame number ",
+		       iFrame, ". (< ", m_nFrames, ").");
   uint8_t * pFrame = static_cast<uint8_t *>(m_pBuffer);
   pFrame += (size_t)iFrame * m_width * m_height * m_BPP;
   return static_cast<void *>(pFrame);
@@ -130,11 +139,21 @@ void Frames::copyFrameTo(void* pDst, int iFrame, int offset, int padding) {
   ::copyFrame(pSrc, pDst, m_width, m_height, m_BPP, offset, padding);
 }
 
+void Frames::copyCurrentFrameTo(void* pDst, int offset, int padding) {
+  copyFrameTo(pDst, -1, offset, padding);
+}
+
 void Frames::convert16BitFrameToJet(uint8_t* pDst, int iFrame,
 				    const uint16_t v_min, const uint16_t v_max,
 				    const uint format) {
   const uint16_t *pSrc = static_cast<const uint16_t *>(getFrame(iFrame));
   ::convert16BitFrameToJet(pSrc, pDst, m_width, m_height, format, v_min, v_max);
+}
+
+void Frames::convertCurrent16BitFrameToJet(uint8_t *pDst,
+				    const uint16_t v_min, const uint16_t v_max,
+				    const uint format) {
+  convert16BitFrameToJet(pDst, -1, v_min, v_max, format);
 }
 
 RGBDFrames::RGBDFrames()

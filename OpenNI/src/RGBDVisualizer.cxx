@@ -1,6 +1,4 @@
 #include "RGBDVisualizer.hpp"
-#include <string.h>
-#include <stdio.h>
 
 void RGBDVisualizer::initSDL(Uint32 flag) {
   SDL_Init(flag);
