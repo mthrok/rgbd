@@ -14,11 +14,12 @@ class ONIStreamer {
   openni::Device        device_;
   openni::VideoStream   streams_[3];
   openni::VideoFrameRef frames_[3];
-  std::chrono::microseconds  timestamps_[3];
 
   std::atomic<bool> streaming_;
   std::mutex  frameMutex_[3];
   std::thread frameUpdater_[3];
+
+  void updateFrameRef(const openni::SensorType type);
 public:
   static void initONI();
   static void quitONI();
@@ -38,8 +39,7 @@ public:
   void startStreaming();
   void stopStreaming();
 
-  void updateFrameRef(const openni::SensorType type);
-  void getCurrentFrame();
+  void getFrame(const openni::SensorType type, void* pBuff, uint64_t* time);
 };
 
 

@@ -13,3 +13,5 @@ Clean up NIDevice API
 Modify recorder to incorperate new NIDevice API
 
 Add initial wait to NIDevice
+
+Change frameupdate thread to handle all the streams

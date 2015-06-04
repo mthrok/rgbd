@@ -15,12 +15,14 @@ void main_exec() {
 };
 
 int main() {
+  int ret = 0;
   ONIStreamer::initONI();
   try {
     main_exec();
   } catch (RuntimeError &e) {
     printf("%s\n", e.what());
+    ret = -1;
   }
   ONIStreamer::quitONI();
-  return 0;
+  return ret;
 };

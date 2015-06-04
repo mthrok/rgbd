@@ -2,7 +2,7 @@
 
 using namespace openni;
 
-const char* getSensorTypeString(const SensorType type) {
+const char* sensorStr(const SensorType type) {
   switch (type) {
   case SENSOR_IR:
     return "SENSOR_IR";
@@ -13,7 +13,7 @@ const char* getSensorTypeString(const SensorType type) {
   }
 }
 
-const char* getPixelFormatString(const PixelFormat val) {
+const char* formatStr(const PixelFormat val) {
   switch (val) {
   case PIXEL_FORMAT_DEPTH_1_MM:
     return "PIXEL_FORMAT_DEPTH_1_MM";
@@ -43,7 +43,7 @@ void printSupportedVideoModes(const SensorInfo* info) {
   for (int i=0; i<mode.getSize(); ++i)
     printf("  %2d, W:%5d, H:%5d, FPS:%3d, %s\n",
 	   i,  mode[i].getResolutionX(), mode[i].getResolutionY(),
-	   mode[i].getFps(), getPixelFormatString(mode[i].getPixelFormat()));
+	   mode[i].getFps(), formatStr(mode[i].getPixelFormat()));
   printf("\n");
 }
 
@@ -58,6 +58,11 @@ void ONIStreamer::quitONI() {
 
 ONIStreamer::ONIStreamer()
   : device_()
+  , streams_()
+  , frames_()
+  , streaming_(false)
+  , frameMutex_()
+  , frameUpdater_()
 {}
 
 ONIStreamer::~ONIStreamer() {
@@ -102,48 +107,66 @@ void ONIStreamer::createStream(const openni::SensorType type,
   const SensorInfo* info = device_.getSensorInfo(type);
   if (!info)
     throw RuntimeError(__func__, ": ",
-	  "No sensor for ", getSensorTypeString(type), " found.");
+	  "No sensor for ", sensorStr(type), " found.");
 
   auto& videomodes = info->getSupportedVideoModes();
   int nModes = videomodes.getSize();
   if (mode < 0 || nModes <= mode)
-    throw RuntimeError(__func__, ":", getSensorTypeString(type), ": ",
+    throw RuntimeError(__func__, ":", sensorStr(type), ": ",
 		       "Invalid video mode (", mode, "). ",
 		       "Value range [0, ", nModes, ").");
 
   auto& stream = streams_[type-1];
   if (STATUS_OK != stream.create(device_, type))
     throw RuntimeError(__func__, ": Failed to create ",
-		       getSensorTypeString(type), " stream.");
+		       sensorStr(type), " stream.");
 
   if (STATUS_OK != stream.setVideoMode(videomodes[mode]))
-    throw RuntimeError(__func__, ":", getSensorTypeString(type), ": ",
+    throw RuntimeError(__func__, ":", sensorStr(type), ": ",
 		       "Failed to set video mode (", mode, ").");
 
   if (mirroring != stream.getMirroringEnabled()){
     if (STATUS_OK != stream.setMirroringEnabled(mirroring))
-      throw RuntimeError(__func__, ":", getSensorTypeString(type), ": Failed ",
+      throw RuntimeError(__func__, ":", sensorStr(type), ": Failed ",
 			 "to ", (mirroring)? "en" : "dis", "able mirroring.");
   }
 }
 
+void ONIStreamer::createDepthStream(const int mode, bool mirroring) {
+  createStream(SENSOR_DEPTH, mode, mirroring);
+}
+
 void ONIStreamer::updateFrameRef(const openni::SensorType type) {
+  int dummy = 0;
+  VideoStream* pStream = &streams_[type-1];
   while (streaming_) {
-    // Wait for new frame to ready
-    int dummy = 0;
-    VideoStream* pStream = &streams_[type-1];
-    OpenNI::waitForAnyStream(&pStream, 1, &dummy, WAIT_STREAM_TIMEOUT);
-    // Acquire the frame
+    OpenNI::waitForAnyStream(&pStream, 1, &dummy); // <- Is this fine?
     std::lock_guard<std::mutex> _(frameMutex_[type-1]);
-    if (STATUS_OK != streams_[type-1].readFrame(&frames_[type-1]))
-      throw RuntimeError(__func__,
-			 ": Failed to read ", getSensorTypeString(type), " Frame");
-    timestamps_[type-1] = getCurrentTimestamp();
+    if (frames_[type-1].isValid())
+      frames_[type-1].release();
+    if (STATUS_OK != pStream->readFrame(&frames_[type-1]))
+      printf("%s:Failed to read frame %s.", __func__, sensorStr(type));
+    else
+      printf("Frame %s, updated: %llu.\n", sensorStr(type), frames_[type-1].getTimestamp());
   }
 };
 
-void ONIStreamer::createDepthStream(const int mode, bool mirroring) {
-  createStream(SENSOR_DEPTH, mode, mirroring);
+void ONIStreamer::getFrame(const SensorType type, void* pBuff, uint64_t *time) {
+  if (!pBuff)
+    throw RuntimeError(__func__, ": Invalid destination buffer.");
+
+  std::lock_guard<std::mutex> _(frameMutex_[type-1]);
+  auto& frame = frames_[type-1];
+  if (!frame.isValid())
+    throw RuntimeError(__func__, ": Invalid frame.");
+  if (time)
+    *time = frame.getTimestamp();
+  uint size = frame.getDataSize();
+  auto *pDst = static_cast<uint8_t*>(pBuff);
+  auto *pSrc = static_cast<const uint8_t*>(frame.getData());
+  for (uint i=0; i<size; ++i)
+    pDst[i] = pSrc[i];
+
 }
 
 void ONIStreamer::startStreaming() {
@@ -152,8 +175,9 @@ void ONIStreamer::startStreaming() {
     auto& stream = streams_[type-1];
     auto& thread = frameUpdater_[type-1];
     if (stream.isValid()) {
+      printf("Starting stream %s\n", sensorStr(type));
       if (STATUS_OK != stream.start())
-	throw RuntimeError(__func__, "Failed to start ", getSensorTypeString(type));
+	throw RuntimeError(__func__, "Failed to start ", sensorStr(type));
       thread = std::thread(&ONIStreamer::updateFrameRef, this, type);
     }
   }
