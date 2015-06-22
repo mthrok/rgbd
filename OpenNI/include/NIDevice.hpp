@@ -2,11 +2,12 @@
 #define __OPENNI_INCLUDE_NIDEVICE_HPP__
 
 #include <mutex>
+#include <atomic>
 #include <string>
 #include <functional>
 
 #include "types.hpp"
-#include "OpenNI2/OpenNI.h"
+#include "openni2/OpenNI.h"
 
 const char* getSensorTypeString(const openni::SensorType type);
 const char* getPixelFormatString(const openni::PixelFormat val);

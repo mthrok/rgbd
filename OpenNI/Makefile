@@ -4,8 +4,8 @@ BDIR = ./bin
 ODIR = ./obj
 
 CXX = c++
-CFLAGS = -I$(IDIR) --std=c++11
-LIBS = -lOpenNi2 -framework SDL2
+CFLAGS = -I$(IDIR) --std=c++11 -I/usr/include
+LIBS = -lOpenNI2 -lSDL2
 
 _DEPS = RGBDVisualizer.hpp NIDevice.hpp io.hpp types.hpp
 DEPS = $(patsubst %,$(IDIR)/%,$(_DEPS))
