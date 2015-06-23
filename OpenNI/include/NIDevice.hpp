@@ -2,6 +2,7 @@
 #define __OPENNI_INCLUDE_NIDEVICE_HPP__
 
 #include <mutex>
+#include <atomic>
 #include <string>
 #include <functional>
 
